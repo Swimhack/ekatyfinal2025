@@ -103,7 +103,13 @@ export async function GET(request: NextRequest) {
     
     // Parse string fields back to arrays for response
     restaurants = restaurants.map(r => ({
-      ...r,
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      rating: r.rating,
+      reviewCount: r.reviewCount,
+      priceLevel: r.priceLevel,
+      photos: r.photos ? r.photos.split(',').map((p: string) => p.trim()) : [],
       categories: r.categories ? r.categories.split(',').map((c: string) => c.trim()) : [],
       cuisineTypes: r.cuisineTypes ? r.cuisineTypes.split(',').map((c: string) => c.trim()) : [],
       photos: r.photos ? r.photos.split(',').map((p: string) => p.trim()) : [],

@@ -136,19 +136,13 @@ export default function RestaurantDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false)
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [user, setUser] = useState<any>(null)
-  const [users, setUsers] = useState<any[]>([])
 
   useEffect(() => {
     if (params.slug) {
       fetchRestaurant(params.slug as string)
     }
     // Mock user session
-    const mockUsers = [
-      { id: 'clq2G1x7q0000v9d8b3e4c5f6', name: 'John Doe' },
-      { id: 'clq2G1x7q0000v9d8b3e4c5f7', name: 'Jane Smith' },
-    ]
-    setUsers(mockUsers)
-    setUser(mockUsers[0])
+    setUser({ id: 'clq2G1x7q0000v9d8b3e4c5f6', name: 'John Doe' })
   }, [params.slug])
 
   useEffect(() => {
@@ -274,21 +268,6 @@ export default function RestaurantDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* User Switcher */}
-      <div className="bg-blue-100 p-2 text-center">
-        <span className="font-bold">Current User:</span> {user?.name}
-        <div className="flex justify-center gap-2 mt-2">
-          {users.map(u => (
-            <button
-              key={u.id}
-              onClick={() => setUser(u)}
-              className={`px-2 py-1 rounded ${user?.id === u.id ? 'bg-blue-500 text-white' : 'bg-white'}`}
-            >
-              {u.name}
-            </button>
-          ))}
-        </div>
-      </div>
       {/* Hero Image */}
       <div className="relative h-96 bg-gray-200">
         <img 
