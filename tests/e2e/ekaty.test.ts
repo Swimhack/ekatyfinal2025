@@ -122,7 +122,8 @@ describe('eKaty E2E Tests', () => {
       await page.goto(`${baseUrl}/spin`);
       
       // Find spin button
-      const spinButton = await page.$('button[data-testid="spin-button"], button:has-text("Spin")');
+      const spinButtonHandle = await page.evaluateHandle(() => Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Spin')));
+      const spinButton = spinButtonHandle.asElement();
       if (spinButton) {
         const isDisabled = await spinButton.evaluate(el => (el as HTMLButtonElement).disabled);
         expect(isDisabled).toBeFalsy();
@@ -131,7 +132,7 @@ describe('eKaty E2E Tests', () => {
         await spinButton.click();
         
         // Wait for animation or result
-        await page.waitForTimeout(3000);
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
         // Check if a result is shown
         const result = await page.$('[data-testid="spin-result"], .result, .winner');
@@ -151,7 +152,7 @@ describe('eKaty E2E Tests', () => {
         await searchInput.type('mexican');
         
         // Wait for results to update
-        await page.waitForTimeout(1000);
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Check if results are filtered or search results page is shown
         const results = await page.$$('[data-testid="restaurant-card"], .restaurant-card, .search-result');
@@ -185,6 +186,37 @@ describe('eKaty E2E Tests', () => {
         
         const address = await page.$eval('*', el => el.textContent?.includes('Katy') || false);
         expect(address).toBeTruthy();
+      }
+    });
+
+    test('should allow users to favorite and review a restaurant', async () => {
+      await page.goto(baseUrl);
+
+      await page.waitForSelector('[data-testid="restaurant-card"], .restaurant-card a, a[href*="/restaurant"]', {
+        timeout: 10000
+      }).catch(() => {});
+
+      const restaurantLink = await page.$('[data-testid="restaurant-card"] a, .restaurant-card a, a[href*="/restaurant"]');
+      if (restaurantLink) {
+        await restaurantLink.click();
+        await page.waitForNavigation();
+
+        const favoriteButton = await page.$('button[title="Add to favorites"]');
+        expect(favoriteButton).toBeTruthy();
+        await favoriteButton.click();
+
+        const reviewButtonHandle = await page.evaluateHandle(() => Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Write a Review')));
+        const reviewButton = reviewButtonHandle.asElement();
+        expect(reviewButton).toBeTruthy();
+        await reviewButton.click();
+
+        await page.waitForSelector('form');
+
+        await page.type('textarea', 'This is a test review.');
+
+        await page.click('button[type="submit"]');
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     });
   });

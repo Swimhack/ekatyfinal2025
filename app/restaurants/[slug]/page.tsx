@@ -5,7 +5,17 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 
 // Review Form Component
-function ReviewForm({ restaurantId, restaurantName, onClose }: { restaurantId: string, restaurantName: string, onClose: () => void }) {
+function ReviewForm({
+  restaurantId,
+  restaurantName,
+  user,
+  onClose,
+}: {
+  restaurantId: string
+  restaurantName: string
+  user: any
+  onClose: () => void
+}) {
   const [rating, setRating] = useState(5)
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
@@ -15,16 +25,33 @@ function ReviewForm({ restaurantId, restaurantName, onClose }: { restaurantId: s
     e.preventDefault()
     setSubmitting(true)
 
-    // In a real app, this would submit to an API endpoint
-    // For now, we'll just show a success message
-    setTimeout(() => {
-      alert('Thank you for your review! In a production app, this would be saved to the database.')
-      setTitle('')
-      setText('')
-      setRating(5)
+    try {
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          restaurantId,
+          userId: user.id,
+          rating,
+          title,
+          text,
+        }),
+      })
+
+      if (response.ok) {
+        alert('Thank you for your review!')
+        setTitle('')
+        setText('')
+        setRating(5)
+        onClose()
+      }
+    } catch (error) {
+      console.error('Error submitting review:', error)
+    } finally {
       setSubmitting(false)
-      onClose()
-    }, 500)
+    }
   }
 
   return (
@@ -108,13 +135,25 @@ export default function RestaurantDetailPage() {
   const [loading, setLoading] = useState(true)
   const [isFavorite, setIsFavorite] = useState(false)
   const [showReviewForm, setShowReviewForm] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [users, setUsers] = useState<any[]>([])
 
   useEffect(() => {
     if (params.slug) {
       fetchRestaurant(params.slug as string)
-      checkFavoriteStatus()
     }
+    // Mock user session
+    const mockUsers = [
+      { id: 'clq2G1x7q0000v9d8b3e4c5f6', name: 'John Doe' },
+      { id: 'clq2G1x7q0000v9d8b3e4c5f7', name: 'Jane Smith' },
+    ]
+    setUsers(mockUsers)
+    setUser(mockUsers[0])
   }, [params.slug])
+
+  useEffect(() => {
+    checkFavoriteStatus()
+  }, [restaurant, user])
 
   const fetchRestaurant = async (slug: string) => {
     try {
@@ -130,31 +169,42 @@ export default function RestaurantDetailPage() {
     }
   }
 
-  const checkFavoriteStatus = () => {
-    if (params.slug && typeof window !== 'undefined') {
-      const favorites = JSON.parse(localStorage.getItem('favorites') || '[]')
-      setIsFavorite(favorites.includes(params.slug as string))
+  const checkFavoriteStatus = async () => {
+    if (restaurant && user) {
+      try {
+        const response = await fetch(
+          `/api/favorites/status?restaurantId=${restaurant.id}&userId=${user.id}`
+        )
+        if (response.ok) {
+          const data = await response.json()
+          setIsFavorite(data.isFavorite)
+        }
+      } catch (error) {
+        console.error('Error checking favorite status:', error)
+      }
     }
   }
 
-  const handleToggleFavorite = () => {
-    if (!params.slug || typeof window === 'undefined') return
-    
-    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]')
-    const slug = params.slug as string
-    
-    if (isFavorite) {
-      // Remove from favorites
-      const updatedFavorites = favorites.filter((f: string) => f !== slug)
-      localStorage.setItem('favorites', JSON.stringify(updatedFavorites))
-      setIsFavorite(false)
-      alert('Removed from favorites')
-    } else {
-      // Add to favorites
-      favorites.push(slug)
-      localStorage.setItem('favorites', JSON.stringify(favorites))
-      setIsFavorite(true)
-      alert('Added to favorites!')
+  const handleToggleFavorite = async () => {
+    if (restaurant && user) {
+      try {
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            restaurantId: restaurant.id,
+            userId: user.id,
+          }),
+        })
+
+        if (response.ok) {
+          setIsFavorite(!isFavorite)
+        }
+      } catch (error) {
+        console.error('Error toggling favorite:', error)
+      }
     }
   }
 
@@ -174,11 +224,6 @@ export default function RestaurantDetailPage() {
       await navigator.clipboard.writeText(window.location.href)
       alert('Link copied to clipboard!')
     }
-  }
-
-  const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(window.location.href)
-    alert('Link copied to clipboard!')
   }
 
   const getPriceLevelDisplay = (level: string) => {
@@ -229,6 +274,21 @@ export default function RestaurantDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* User Switcher */}
+      <div className="bg-blue-100 p-2 text-center">
+        <span className="font-bold">Current User:</span> {user?.name}
+        <div className="flex justify-center gap-2 mt-2">
+          {users.map(u => (
+            <button
+              key={u.id}
+              onClick={() => setUser(u)}
+              className={`px-2 py-1 rounded ${user?.id === u.id ? 'bg-blue-500 text-white' : 'bg-white'}`}
+            >
+              {u.name}
+            </button>
+          ))}
+        </div>
+      </div>
       {/* Hero Image */}
       <div className="relative h-96 bg-gray-200">
         <img 
@@ -286,13 +346,23 @@ export default function RestaurantDetailPage() {
                   </svg>
                 </button>
                 <button
-                  onClick={handleCopyLink}
+                  onClick={handleShareRestaurant}
                   className="bg-white/10 backdrop-blur-sm p-3 rounded-lg hover:bg-white/20 transition-colors"
                   aria-label="Share restaurant"
                   title="Share restaurant"
                 >
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  <svg
+                    className="w-6 h-6 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                    />
                   </svg>
                 </button>
               </div>
@@ -348,9 +418,10 @@ export default function RestaurantDetailPage() {
 
               {/* Review Form */}
               {showReviewForm && (
-                <ReviewForm 
+                <ReviewForm
                   restaurantId={restaurant.id}
                   restaurantName={restaurant.name}
+                  user={user}
                   onClose={() => setShowReviewForm(false)}
                 />
               )}

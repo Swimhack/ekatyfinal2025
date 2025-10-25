@@ -65,6 +65,13 @@ async function seedUsers() {
       name: 'Restaurant Owner',
       passwordHash: await bcrypt.hash('advertiser123!', 10),
       role: 'ADVERTISER' as const
+    },
+    {
+      id: 'clq2G1x7q0000v9d8b3e4c5f6',
+      email: 'johndoe@gmail.com',
+      name: 'John Doe',
+      passwordHash: await bcrypt.hash('johndoe123!', 10),
+      role: 'USER' as const
     }
   ]
   
