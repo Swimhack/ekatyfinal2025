@@ -5,43 +5,38 @@ import { useEffect, useRef, useCallback } from 'react'
 interface UseSoundOptions {
   volume?: number
   loop?: boolean
-  autoplay?: boolean
 }
 
 export function useSound(url: string, options: UseSoundOptions = {}) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const { volume = 1, loop = false, autoplay = false } = options
+  const { volume = 1, loop = false } = options
 
+  // Effect for cleanup on unmount or when URL changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      audioRef.current = new Audio(url)
-      audioRef.current.volume = volume
-      audioRef.current.loop = loop
-      
-      if (autoplay) {
-        audioRef.current.play().catch(() => {
-          // Autoplay was prevented, which is common
-          console.log('Autoplay prevented')
-        })
-      }
-    }
-
     return () => {
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current = null
       }
     }
-  }, [url, volume, loop, autoplay])
+  }, [url])
 
   const play = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0
-      audioRef.current.play().catch(err => {
-        console.error('Error playing sound:', err)
-      })
+    if (typeof window === 'undefined') return
+
+    // Lazily initialize the Audio element on first play
+    if (!audioRef.current) {
+      audioRef.current = new Audio(url)
     }
-  }, [])
+
+    // Set latest options and play
+    audioRef.current.volume = volume
+    audioRef.current.loop = loop
+    audioRef.current.currentTime = 0
+    audioRef.current.play().catch(err => {
+      console.error('Error playing sound:', err)
+    })
+  }, [url, volume, loop])
 
   const stop = useCallback(() => {
     if (audioRef.current) {
