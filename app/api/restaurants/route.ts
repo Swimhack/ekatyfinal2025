@@ -23,19 +23,31 @@ export async function GET(request: NextRequest) {
       active: true
     }
     
-    // Text search (SQLite doesn't support mode)
+    // Build AND clause for filters
+    const andClause: Prisma.RestaurantWhereInput[] = []
+
+    // Text search (case-insensitive for SQLite)
     if (q) {
-      where.OR = [
-        { name: { contains: q } },
-        { description: { contains: q } },
-        { categories: { contains: q } },
-        { cuisineTypes: { contains: q } }
-      ]
+      const lowerQ = q.toLowerCase()
+      andClause.push({
+        OR: [
+          { name: { contains: lowerQ, mode: 'insensitive' } },
+          { description: { contains: lowerQ, mode: 'insensitive' } },
+          { categories: { contains: lowerQ, mode: 'insensitive' } },
+          { cuisineTypes: { contains: lowerQ, mode: 'insensitive' } }
+        ]
+      })
     }
     
     // Category filter
     if (category) {
-      where.categories = { contains: category }
+      andClause.push({
+        categories: { contains: category }
+      })
+    }
+
+    if (andClause.length > 0) {
+      where.AND = andClause
     }
     
     // Price level filter
