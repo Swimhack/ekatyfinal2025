@@ -38,53 +38,51 @@ export async function POST(request: NextRequest) {
       where.priceLevel = priceLevel
     }
     
-    // Get candidate restaurants
-    let candidates = await prisma.restaurant.findMany({
-      where,
-      include: {
-        _count: {
-          select: {
-            reviews: true,
-            favorites: true
+    let candidates = []
+    let relaxationLevel = 0
+    const relaxationSteps = [
+      { price: true, categories: true, radius: radius },
+      { price: false, categories: true, radius: radius },
+      { price: false, categories: false, radius: radius },
+      { price: false, categories: false, radius: radius * 2 },
+      { price: false, categories: false, radius: radius * 4 }
+    ]
+
+    while (candidates.length === 0 && relaxationLevel < relaxationSteps.length) {
+      const step = relaxationSteps[relaxationLevel]
+      
+      const currentWhere = { ...where }
+      if (!step.price) delete currentWhere.priceLevel
+      if (!step.categories) delete currentWhere.OR
+      
+      let potentialCandidates = await prisma.restaurant.findMany({
+        where: currentWhere,
+        include: {
+          _count: {
+            select: {
+              reviews: true,
+              favorites: true
+            }
           }
         }
-      }
-    })
-    
-    // Filter by distance if coordinates provided
-    if (lat && lng) {
-      const userLat = parseFloat(lat)
-      const userLng = parseFloat(lng)
-      const maxDistance = parseFloat(radius)
-      
-      candidates = candidates.filter(restaurant => {
-        const distance = calculateDistance(
-          userLat,
-          userLng,
-          restaurant.latitude,
-          restaurant.longitude
+      })
+
+      // Filter by distance
+      if (lat && lng) {
+        const userLat = parseFloat(lat)
+        const userLng = parseFloat(lng)
+        potentialCandidates = potentialCandidates.filter(r =>
+          calculateDistance(userLat, userLng, r.latitude, r.longitude) <= step.radius
         )
-        return distance <= maxDistance
-      })
-    }
-    
-    // Filter by open now (simplified - would need real hours checking)
-    if (openNow) {
-      const now = new Date()
-      const currentHour = now.getHours()
-      const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-      const currentDay = days[now.getDay()] // 'mon', 'tue', etc.
-      
-      candidates = candidates.filter(restaurant => {
-        // This is simplified - real implementation would parse hours JSON
-        // For now, assume restaurants open 11am-10pm
-        return currentHour >= 11 && currentHour < 22
-      })
+      }
+
+      candidates = potentialCandidates
+      relaxationLevel++
     }
     
     if (candidates.length === 0) {
       return NextResponse.json(
-        { error: 'No restaurants match your criteria' },
+        { error: 'No restaurants found, even after expanding search.' },
         { status: 404 }
       )
     }
