@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { sendEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,9 +38,22 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // In production, you would send an email notification here
-    // For now, we'll just log it
-    console.log('New contact submission:', submission)
+    // Send email notification to admin
+    await sendEmail({
+      to: 'james@ekaty.com',
+      subject: `New Contact Form Submission: ${subject}`,
+      html: `
+        <h1>New Contact Submission</h1>
+        <p><strong>Type:</strong> ${type}</p>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
+        ${restaurantName ? `<p><strong>Restaurant:</strong> ${restaurantName}</p>` : ''}
+        <hr>
+        <h2>Message:</h2>
+        <p>${message.replace(/\n/g, '<br>')}</p>
+      `
+    })
 
     // Send confirmation email to user (in production)
     // await sendEmail({
