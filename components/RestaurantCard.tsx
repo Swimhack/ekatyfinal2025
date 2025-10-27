@@ -22,7 +22,7 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
   }
 
   return (
-    <Link href={`/restaurants/${restaurant.slug || restaurant.id}`}>
+    <Link href={`/restaurants/${restaurant.slug || restaurant.id}`} data-testid="restaurant-card">
       <div className="card overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer group">
         {/* Image */}
         <div className="relative h-48 bg-gray-200 overflow-hidden">

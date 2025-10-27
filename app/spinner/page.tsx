@@ -228,7 +228,7 @@ export default function SpinnerPage() {
               <div className="relative mb-8">
                 <div className="w-64 h-64 mx-auto relative">
                   {/* Wheel */}
-                  <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 shadow-2xl ${
+                  <div data-testid="spinner-wheel" className={`absolute inset-0 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 shadow-2xl ${
                     isSpinning ? 'animate-spin' : ''
                   }`}>
                     <div className="absolute inset-2 rounded-full bg-white flex items-center justify-center">
