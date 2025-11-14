@@ -24,7 +24,7 @@ export default function MobileNavigation() {
             {/* Logo and Brand */}
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-1" onClick={closeMobileMenu}>
-                <img src="/logo.png" alt="eKaty" className="h-15 w-auto" />
+                <img src="/logo.png" alt="eKaty" className="h-12 w-auto" />
               </Link>
             </div>
 
