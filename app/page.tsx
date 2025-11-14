@@ -80,7 +80,7 @@ export default function HomePage() {
               <span>🎉</span>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
-              Discover Katy's Best Restaurants
+              explore the best restaurants in Katy
             </h1>
             <p className="text-xl md:text-2xl mb-4 text-primary-100">
               Your AI-powered guide to local dining experiences
