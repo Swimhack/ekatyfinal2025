@@ -95,15 +95,22 @@ export default function EditRestaurantPage() {
         const logoFormData = new FormData()
         logoFormData.append('file', logoFile)
         logoFormData.append('type', 'logo')
-        
+
         const uploadResponse = await fetch('/api/admin/upload', {
           method: 'POST',
           body: logoFormData
         })
-        
+
         if (uploadResponse.ok) {
           const { url } = await uploadResponse.json()
           uploadedLogoUrl = url
+          console.log('Logo uploaded successfully to:', url)
+        } else {
+          const error = await uploadResponse.text()
+          console.error('Logo upload failed:', error)
+          alert('Failed to upload logo: ' + error)
+          setSaving(false)
+          return // Stop execution if logo upload fails
         }
       }
 
@@ -112,12 +119,12 @@ export default function EditRestaurantPage() {
         const heroFormData = new FormData()
         heroFormData.append('file', heroImageFile)
         heroFormData.append('type', 'hero')
-        
+
         const uploadResponse = await fetch('/api/admin/upload', {
           method: 'POST',
           body: heroFormData
         })
-        
+
         if (uploadResponse.ok) {
           const { url } = await uploadResponse.json()
           uploadedHeroImage = url
@@ -126,6 +133,8 @@ export default function EditRestaurantPage() {
           const error = await uploadResponse.text()
           console.error('Hero image upload failed:', error)
           alert('Failed to upload hero image: ' + error)
+          setSaving(false)
+          return // Stop execution if hero image upload fails
         }
       } else {
         console.log('No hero image file to upload, using existing:', uploadedHeroImage)
@@ -137,18 +146,25 @@ export default function EditRestaurantPage() {
           const photoFormData = new FormData()
           photoFormData.append('file', file)
           photoFormData.append('type', 'photo')
-          
+
           const uploadResponse = await fetch('/api/admin/upload', {
             method: 'POST',
             body: photoFormData
           })
-          
+
           if (uploadResponse.ok) {
             const { url } = await uploadResponse.json()
             photoUrls.push(url)
+            console.log('Photo uploaded successfully:', url)
+          } else {
+            const error = await uploadResponse.text()
+            console.error('Photo upload failed:', error)
+            alert(`Failed to upload photo ${file.name}: ${error}`)
+            setSaving(false)
+            return // Stop execution if any photo upload fails
           }
         }
-        
+
         // Combine with existing photos
         const existingPhotos = formData.photos ? formData.photos.split(',').filter(Boolean) : []
         uploadedPhotos = [...existingPhotos, ...photoUrls].join(',')
@@ -172,22 +188,27 @@ export default function EditRestaurantPage() {
       if (response.ok) {
         const result = await response.json()
         console.log('Update response:', result)
-        
+
         // Verify the hero image was actually saved
         const verifyResponse = await fetch(`/api/admin/restaurants/${restaurantId}`)
         if (verifyResponse.ok) {
           const verifiedData = await verifyResponse.json()
           console.log('Verified hero image after save:', verifiedData.heroImage)
-          
+
           if (updateData.heroImage && !verifiedData.heroImage) {
-            alert('Warning: Restaurant updated but hero image may not have been saved correctly. Please check the image.')
-          } else {
-            alert('Restaurant updated successfully!')
+            alert('Error: Restaurant updated but hero image was not saved. Please try uploading the hero image again.')
+            setSaving(false)
+            return // Stop and don't redirect if hero image wasn't saved
           }
         } else {
-          alert('Restaurant updated successfully!')
+          console.error('Verification request failed')
+          alert('Warning: Could not verify if changes were saved correctly. Please refresh the page to check.')
+          setSaving(false)
+          return // Stop if verification fails
         }
-        
+
+        alert('Restaurant updated successfully!')
+
         // Force reload to clear cache
         window.location.href = `/restaurants/${restaurant.slug}`
       } else {
