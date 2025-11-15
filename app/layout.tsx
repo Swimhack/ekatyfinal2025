@@ -56,9 +56,6 @@ export default function RootLayout({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               {/* Brand Column */}
               <div>
-                <div className="mb-4">
-                  <img src="/logo.png" alt="eKaty" className="h-8 w-auto" />
-                </div>
                 <p className="text-gray-400 text-sm">
                   Your AI-powered guide to the best restaurants in Katy, Texas.
                 </p>
