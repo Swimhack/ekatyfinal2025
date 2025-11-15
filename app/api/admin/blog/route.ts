@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { generateArticleFromTitle, generateArticleWithAI } from '@/lib/blog/anthropic'
 import { slugify, fixBrokenLinksInContent } from '@/lib/blog/utils'
 
+// Increase timeout for AI blog generation (can take 30-60 seconds)
+// This tells Next.js/Vercel that this route can take longer
+export const maxDuration = 60 // 60 seconds
+
 // Verify admin authentication
 function verifyAdminAuth(request: Request): boolean {
   const authHeader = request.headers.get('authorization')

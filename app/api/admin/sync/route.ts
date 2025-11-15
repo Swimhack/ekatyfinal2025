@@ -6,6 +6,10 @@ import { validateApiKey } from '@/lib/google-places/client'
 
 const prisma = new PrismaClient()
 
+// Increase timeout for long-running sync operations
+// This tells Next.js/Vercel that this route can take longer
+export const maxDuration = 300 // 5 minutes
+
 // Verify API key from request
 function verifyAdminAuth(request: Request): boolean {
   const authHeader = request.headers.get('authorization')

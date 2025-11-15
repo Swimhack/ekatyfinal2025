@@ -27,19 +27,34 @@ export async function GET(request: NextRequest) {
     }
 
     // Exchange code for tokens
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        code,
-        client_id: googleClientId,
-        client_secret: googleClientSecret,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-      }),
-    })
+    // Add timeout to prevent 502 errors
+    const tokenController = new AbortController()
+    const tokenTimeoutId = setTimeout(() => tokenController.abort(), 30000) // 30 second timeout
+
+    let tokenResponse: Response
+    try {
+      tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          code,
+          client_id: googleClientId,
+          client_secret: googleClientSecret,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }),
+        signal: tokenController.signal
+      })
+      clearTimeout(tokenTimeoutId)
+    } catch (error) {
+      clearTimeout(tokenTimeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        return NextResponse.redirect(`${baseUrl}/auth/signin?error=oauth_timeout`)
+      }
+      throw error
+    }
 
     if (!tokenResponse.ok) {
       return NextResponse.redirect(`${baseUrl}/auth/signin?error=token_exchange_failed`)
@@ -49,11 +64,25 @@ export async function GET(request: NextRequest) {
     const accessToken = tokens.access_token
 
     // Get user info from Google
-    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    })
+    const userInfoController = new AbortController()
+    const userInfoTimeoutId = setTimeout(() => userInfoController.abort(), 30000) // 30 second timeout
+
+    let userInfoResponse: Response
+    try {
+      userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        signal: userInfoController.signal
+      })
+      clearTimeout(userInfoTimeoutId)
+    } catch (error) {
+      clearTimeout(userInfoTimeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        return NextResponse.redirect(`${baseUrl}/auth/signin?error=oauth_timeout`)
+      }
+      throw error
+    }
 
     if (!userInfoResponse.ok) {
       return NextResponse.redirect(`${baseUrl}/auth/signin?error=user_info_failed`)

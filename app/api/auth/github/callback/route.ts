@@ -27,19 +27,34 @@ export async function GET(request: NextRequest) {
     }
 
     // Exchange code for access token
-    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: githubClientId,
-        client_secret: githubClientSecret,
-        code,
-        redirect_uri: redirectUri,
-      }),
-    })
+    // Add timeout to prevent 502 errors
+    const tokenController = new AbortController()
+    const tokenTimeoutId = setTimeout(() => tokenController.abort(), 30000) // 30 second timeout
+
+    let tokenResponse: Response
+    try {
+      tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: githubClientId,
+          client_secret: githubClientSecret,
+          code,
+          redirect_uri: redirectUri,
+        }),
+        signal: tokenController.signal
+      })
+      clearTimeout(tokenTimeoutId)
+    } catch (error) {
+      clearTimeout(tokenTimeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        return NextResponse.redirect(`${baseUrl}/auth/signin?error=oauth_timeout`)
+      }
+      throw error
+    }
 
     if (!tokenResponse.ok) {
       return NextResponse.redirect(`${baseUrl}/auth/signin?error=token_exchange_failed`)
@@ -53,12 +68,26 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user info from GitHub
-    const userInfoResponse = await fetch('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-    })
+    const userInfoController = new AbortController()
+    const userInfoTimeoutId = setTimeout(() => userInfoController.abort(), 30000) // 30 second timeout
+
+    let userInfoResponse: Response
+    try {
+      userInfoResponse = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+        signal: userInfoController.signal
+      })
+      clearTimeout(userInfoTimeoutId)
+    } catch (error) {
+      clearTimeout(userInfoTimeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        return NextResponse.redirect(`${baseUrl}/auth/signin?error=oauth_timeout`)
+      }
+      throw error
+    }
 
     if (!userInfoResponse.ok) {
       return NextResponse.redirect(`${baseUrl}/auth/signin?error=user_info_failed`)
@@ -69,16 +98,29 @@ export async function GET(request: NextRequest) {
     // Get user email (may need separate API call)
     let email = githubUser.email
     if (!email) {
-      const emailResponse = await fetch('https://api.github.com/user/emails', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/vnd.github.v3+json',
-        },
-      })
-      if (emailResponse.ok) {
-        const emails = await emailResponse.json()
-        const primaryEmail = emails.find((e: any) => e.primary) || emails[0]
-        email = primaryEmail?.email
+      const emailController = new AbortController()
+      const emailTimeoutId = setTimeout(() => emailController.abort(), 30000) // 30 second timeout
+
+      try {
+        const emailResponse = await fetch('https://api.github.com/user/emails', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'application/vnd.github.v3+json',
+          },
+          signal: emailController.signal
+        })
+        clearTimeout(emailTimeoutId)
+        if (emailResponse.ok) {
+          const emails = await emailResponse.json()
+          const primaryEmail = emails.find((e: any) => e.primary) || emails[0]
+          email = primaryEmail?.email
+        }
+      } catch (error) {
+        clearTimeout(emailTimeoutId)
+        if (error instanceof Error && error.name === 'AbortError') {
+          return NextResponse.redirect(`${baseUrl}/auth/signin?error=oauth_timeout`)
+        }
+        throw error
       }
     }
 

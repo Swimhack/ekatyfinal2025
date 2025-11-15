@@ -3,6 +3,10 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// Increase timeout for long-running sync operations
+// This tells Next.js/Vercel that this route can take longer
+export const maxDuration = 300 // 5 minutes
+
 // Katy, TX coordinates
 const KATY_CENTER = { lat: 29.7858, lng: -95.8244 }
 const SEARCH_RADIUS = 10000 // 10km radius
@@ -19,27 +23,54 @@ async function fetchGooglePlaces() {
   if (!apiKey) throw new Error('Google Maps API key not configured')
 
   const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${KATY_CENTER.lat},${KATY_CENTER.lng}&radius=${SEARCH_RADIUS}&type=restaurant&key=${apiKey}`
-  
-  const response = await fetch(url)
-  const data = await response.json()
-  
-  let allResults = data.results || []
-  let nextPageToken = data.next_page_token
-  
-  // Fetch additional pages
-  while (nextPageToken && allResults.length < 200) {
-    await new Promise(resolve => setTimeout(resolve, 2000)) // Required delay
-    const nextUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${nextPageToken}&key=${apiKey}`
-    const nextResponse = await fetch(nextUrl)
-    const nextData = await nextResponse.json()
-    
-    if (nextData.results) {
-      allResults = [...allResults, ...nextData.results]
+
+  // Add timeout to prevent 502 errors
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
+    const data = await response.json()
+
+    let allResults = data.results || []
+    let nextPageToken = data.next_page_token
+
+    // Fetch additional pages
+    while (nextPageToken && allResults.length < 200) {
+      await new Promise(resolve => setTimeout(resolve, 2000)) // Required delay
+      const nextUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${nextPageToken}&key=${apiKey}`
+
+      const nextController = new AbortController()
+      const nextTimeoutId = setTimeout(() => nextController.abort(), 30000)
+
+      try {
+        const nextResponse = await fetch(nextUrl, { signal: nextController.signal })
+        clearTimeout(nextTimeoutId)
+        const nextData = await nextResponse.json()
+
+        if (nextData.results) {
+          allResults = [...allResults, ...nextData.results]
+        }
+        nextPageToken = nextData.next_page_token
+      } catch (error) {
+        clearTimeout(nextTimeoutId)
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.error('Google Places pagination request timed out')
+          break
+        }
+        throw error
+      }
     }
-    nextPageToken = nextData.next_page_token
+
+    return allResults
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Google Places API request timed out')
+    }
+    throw error
   }
-  
-  return allResults
 }
 
 // Yelp Fusion API
@@ -55,17 +86,23 @@ async function fetchYelpBusinesses() {
   
   // Yelp allows max 50 results per request, offset up to 1000
   for (let offset = 0; offset < 200; offset += 50) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
     try {
       const url = `https://api.yelp.com/v3/businesses/search?latitude=${KATY_CENTER.lat}&longitude=${KATY_CENTER.lng}&radius=${SEARCH_RADIUS}&categories=${categories}&limit=50&offset=${offset}`
-      
+
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${apiKey}`
-        }
+        },
+        signal: controller.signal
       })
-      
+
+      clearTimeout(timeoutId)
+
       if (!response.ok) break
-      
+
       const data = await response.json()
       if (data.businesses && data.businesses.length > 0) {
         results.push(...data.businesses)
@@ -73,6 +110,11 @@ async function fetchYelpBusinesses() {
         break
       }
     } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('Yelp API request timed out at offset', offset)
+        break
+      }
       console.error('Yelp API error:', error)
       break
     }
@@ -89,24 +131,35 @@ async function fetchFoursquarePlaces() {
     return []
   }
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
   try {
     const url = `https://api.foursquare.com/v3/places/search?ll=${KATY_CENTER.lat},${KATY_CENTER.lng}&radius=${SEARCH_RADIUS}&categories=13000&limit=50`
-    
+
     const response = await fetch(url, {
       headers: {
         'Authorization': apiKey,
         'Accept': 'application/json'
-      }
+      },
+      signal: controller.signal
     })
-    
+
+    clearTimeout(timeoutId)
+
     if (!response.ok) {
       console.log('⚠️  Foursquare API error, skipping')
       return []
     }
-    
+
     const data = await response.json()
     return data.results || []
   } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error('Foursquare API request timed out')
+      return []
+    }
     console.error('Foursquare API error:', error)
     return []
   }
@@ -114,6 +167,9 @@ async function fetchFoursquarePlaces() {
 
 // OpenStreetMap Overpass API (Free, no key required)
 async function fetchOpenStreetMapPlaces() {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 35000) // 35 second timeout (Overpass has 25s internal timeout)
+
   try {
     // Overpass query for restaurants in Katy area
     const query = `
@@ -126,20 +182,28 @@ async function fetchOpenStreetMapPlaces() {
       >;
       out skel qt;
     `
-    
+
     const response = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
-      body: query
+      body: query,
+      signal: controller.signal
     })
-    
+
+    clearTimeout(timeoutId)
+
     if (!response.ok) {
       console.log('⚠️  OpenStreetMap API error, skipping')
       return []
     }
-    
+
     const data = await response.json()
     return data.elements || []
   } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error('OpenStreetMap API request timed out')
+      return []
+    }
     console.error('OpenStreetMap API error:', error)
     return []
   }

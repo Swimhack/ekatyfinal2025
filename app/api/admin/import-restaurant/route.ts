@@ -10,15 +10,28 @@ async function searchRestaurantByName(name: string) {
 
   // Text search for the restaurant in Katy, TX area
   const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(name + ' Katy TX')}&key=${apiKey}`
-  
-  const response = await fetch(searchUrl)
-  const data = await response.json()
-  
-  if (data.status !== 'OK' || !data.results || data.results.length === 0) {
-    return null
+
+  // Add timeout to prevent 502 errors
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+  try {
+    const response = await fetch(searchUrl, { signal: controller.signal })
+    clearTimeout(timeoutId)
+    const data = await response.json()
+
+    if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+      return null
+    }
+
+    return data.results[0] // Return the first (best) match
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Google Places search timed out')
+    }
+    throw error
   }
-  
-  return data.results[0] // Return the first (best) match
 }
 
 // Get detailed information about a place
@@ -44,15 +57,28 @@ async function getPlaceDetails(placeId: string) {
   ].join(',')
 
   const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${apiKey}`
-  
-  const response = await fetch(detailsUrl)
-  const data = await response.json()
-  
-  if (data.status !== 'OK' || !data.result) {
-    throw new Error(`Failed to get place details: ${data.status}`)
+
+  // Add timeout to prevent 502 errors
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+  try {
+    const response = await fetch(detailsUrl, { signal: controller.signal })
+    clearTimeout(timeoutId)
+    const data = await response.json()
+
+    if (data.status !== 'OK' || !data.result) {
+      throw new Error(`Failed to get place details: ${data.status}`)
+    }
+
+    return data.result
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Google Places details fetch timed out')
+    }
+    throw error
   }
-  
-  return data.result
 }
 
 // Transform Google Place data to our restaurant format

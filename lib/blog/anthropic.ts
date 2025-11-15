@@ -139,17 +139,31 @@ Your writing style:
     ]
   }
   
-  // Make API call
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey.trim(),
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify(data)
-  })
-  
+  // Make API call with timeout to prevent 502 errors
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 55000) // 55 second timeout (before Fly.io's 60s proxy timeout)
+
+  let response: Response
+  try {
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey.trim(),
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify(data),
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('AI generation timed out. Please try again with a shorter article or simpler topic.')
+    }
+    throw error
+  }
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
     const errorMessage = errorData.error?.message || `API request failed with code ${response.status}`
