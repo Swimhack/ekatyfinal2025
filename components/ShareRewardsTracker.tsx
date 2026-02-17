@@ -108,14 +108,16 @@ export default function ShareRewardsTracker() {
 
     // Listen for share events
     const handleShare = () => {
-      const newCount = shareCount + 1
-      setShareCount(newCount)
-      localStorage.setItem('ekaty_share_count', newCount.toString())
+      setShareCount(prev => {
+        const newCount = prev + 1
+        localStorage.setItem('ekaty_share_count', newCount.toString())
+        return newCount
+      })
     }
 
     window.addEventListener('ekaty:share', handleShare)
     return () => window.removeEventListener('ekaty:share', handleShare)
-  }, [shareCount])
+  }, [])
 
   const unlockedAchievements = achievements.filter(a => a.unlocked).length
   const totalAchievements = achievements.length

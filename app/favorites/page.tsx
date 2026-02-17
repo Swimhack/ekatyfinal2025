@@ -58,6 +58,7 @@ export default function FavoritesPage() {
   const copyShareUrl = () => {
     navigator.clipboard.writeText(shareUrl)
     alert('Link copied to clipboard!')
+    window.dispatchEvent(new CustomEvent('ekaty:share'))
   }
 
   return (

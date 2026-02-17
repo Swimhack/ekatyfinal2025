@@ -87,6 +87,7 @@ export default function ShareDiscoveryCard({ restaurant }: ShareDiscoveryCardPro
       link.click()
 
       // Track the share
+      window.dispatchEvent(new CustomEvent('ekaty:share'))
       await fetch('/api/track-share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,6 +120,7 @@ export default function ShareDiscoveryCard({ restaurant }: ShareDiscoveryCardPro
     }
 
     // Track the share
+    window.dispatchEvent(new CustomEvent('ekaty:share'))
     await fetch('/api/track-share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

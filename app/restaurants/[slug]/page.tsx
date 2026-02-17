@@ -183,6 +183,7 @@ export default function RestaurantDetailPage() {
           text: `Check out ${restaurant.name} in Katy, Texas!`,
           url: window.location.href,
         })
+        window.dispatchEvent(new CustomEvent('ekaty:share'))
       } catch (err) {
         // User cancelled or error occurred
       }
@@ -190,12 +191,14 @@ export default function RestaurantDetailPage() {
       // Fallback: copy to clipboard
       await navigator.clipboard.writeText(window.location.href)
       toast.success('Link copied to clipboard!')
+      window.dispatchEvent(new CustomEvent('ekaty:share'))
     }
   }
 
   const handleCopyLink = async () => {
     await navigator.clipboard.writeText(window.location.href)
     toast.success('Link copied to clipboard!')
+    window.dispatchEvent(new CustomEvent('ekaty:share'))
   }
 
   const getPriceLevelDisplay = (level: string) => {

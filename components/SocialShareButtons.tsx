@@ -13,6 +13,10 @@ export default function SocialShareButtons({ title, url, description }: SocialSh
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ekaty.fly.dev'
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`
 
+  const trackShare = () => {
+    window.dispatchEvent(new CustomEvent('ekaty:share'))
+  }
+
   const handleShare = async () => {
     if (navigator.share) {
       try {
@@ -21,6 +25,7 @@ export default function SocialShareButtons({ title, url, description }: SocialSh
           text: description || title,
           url: fullUrl
         })
+        trackShare()
       } catch (error) {
         // User cancelled or error occurred
       }
@@ -29,6 +34,7 @@ export default function SocialShareButtons({ title, url, description }: SocialSh
       navigator.clipboard.writeText(fullUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+      trackShare()
     }
   }
 
@@ -44,6 +50,7 @@ export default function SocialShareButtons({ title, url, description }: SocialSh
           href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(fullUrl)}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={trackShare}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all hover:scale-105 shadow-md hover:shadow-lg"
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -56,6 +63,7 @@ export default function SocialShareButtons({ title, url, description }: SocialSh
           href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(fullUrl)}&text=${encodeURIComponent(title)}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={trackShare}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-500 text-white rounded-lg font-medium hover:bg-sky-600 transition-all hover:scale-105 shadow-md hover:shadow-lg"
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -68,6 +76,7 @@ export default function SocialShareButtons({ title, url, description }: SocialSh
           href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(fullUrl)}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={trackShare}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800 transition-all hover:scale-105 shadow-md hover:shadow-lg"
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -78,6 +87,7 @@ export default function SocialShareButtons({ title, url, description }: SocialSh
         
         <a
           href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(`Check out this article: ${fullUrl}`)}`}
+          onClick={trackShare}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-all hover:scale-105 shadow-md hover:shadow-lg"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

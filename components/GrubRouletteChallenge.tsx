@@ -52,6 +52,7 @@ export default function GrubRouletteChallenge({ restaurant, spinNumber }: GrubRo
     window.open(urls[platform], '_blank', 'width=600,height=400')
 
     // Track the share
+    window.dispatchEvent(new CustomEvent('ekaty:share'))
     fetch('/api/track-share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
