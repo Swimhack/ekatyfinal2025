@@ -130,10 +130,17 @@
         }
 
         .logo {
-            height: 120px;
-            width: auto;
+            font-size: 110px;
+            font-weight: 900;
+            color: white;
             margin-bottom: 8px;
-            filter: drop-shadow(0 4px 20px rgba(255, 255, 255, 0.8)) drop-shadow(0 2px 8px rgba(255, 255, 255, 0.5));
+            text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            letter-spacing: -3px;
+            line-height: 1;
+        }
+
+        .logo span {
+            color: #fbbf24;
         }
 
         .tagline {
@@ -233,7 +240,7 @@
 
         <!-- Main content -->
         <div class="content">
-            <img src="logo.png" class="logo" alt="eKaty.com" />
+            <div class="logo">e<span>Katy</span></div>
             <div class="tagline">Katy's Best Restaurant Guide</div>
             <div class="divider"></div>
             <div class="subtitle"><span class="highlight">500+</span> Restaurants &bull; BBQ &bull; Tex-Mex &bull; Asian &bull; Seafood</div>
