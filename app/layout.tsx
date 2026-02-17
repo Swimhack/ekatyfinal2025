@@ -48,7 +48,10 @@ export const metadata: Metadata = {
     images: ['/og-image.png'],
   },
   alternates: {
-    canonical: 'https://ekaty.fly.dev'
+    canonical: 'https://ekaty.fly.dev',
+    types: {
+      'application/rss+xml': 'https://ekaty.fly.dev/feed.xml',
+    },
   }
 }
 

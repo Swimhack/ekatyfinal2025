@@ -75,5 +75,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }))
 
-  return [...staticPages, ...categoryPages, ...restaurantPages]
+  // Blog articles
+  let blogArticles: any[] = []
+  try {
+    const blogResponse = await fetch(`${baseUrl}/api/blog?limit=100`, {
+      next: { revalidate: 3600 }
+    })
+    const blogData = await blogResponse.json()
+    blogArticles = blogData.articles || []
+  } catch (error) {
+    console.error('Error fetching blog articles for sitemap:', error)
+  }
+
+  const blogPages = [
+    {
+      url: `${baseUrl}/blog`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    },
+    ...blogArticles.map((article: any) => ({
+      url: `${baseUrl}/blog/${article.slug}`,
+      lastModified: article.updatedAt ? new Date(article.updatedAt) : new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    })),
+  ]
+
+  return [...staticPages, ...categoryPages, ...restaurantPages, ...blogPages]
 }
