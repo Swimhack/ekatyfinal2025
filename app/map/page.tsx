@@ -11,13 +11,13 @@ export const metadata = {
   openGraph: {
     title: 'Restaurant Map | eKaty - Explore Katy Restaurants',
     description: 'Interactive map of all restaurants in Katy, Texas. Find dining options near you with our easy-to-use restaurant map.',
-    images: ['/og-image.png'],
+    images: ['/og-image.jpg'],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Restaurant Map | eKaty - Explore Katy Restaurants',
     description: 'Interactive map of all restaurants in Katy, Texas. Find dining options near you with our easy-to-use restaurant map.',
-    images: ['/og-image.png'],
+    images: ['/og-image.jpg'],
   },
 }
 

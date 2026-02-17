@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [
       {
-        url: '/og-image.png',
+        url: '/og-image.jpg',
         width: 1200,
         height: 630,
         alt: 'eKaty - Discover Katy\'s Best Restaurants',
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Best Restaurants in Katy TX | eKaty',
     description: 'Discover 500+ restaurants in Katy, Texas. AI-powered recommendations & Grub Roulette picker!',
-    images: ['/og-image.png'],
+    images: ['/og-image.jpg'],
   },
   alternates: {
     canonical: 'https://ekaty.fly.dev',

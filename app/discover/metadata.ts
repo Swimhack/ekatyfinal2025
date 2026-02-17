@@ -8,13 +8,13 @@ export const metadata: Metadata = {
     title: 'Discover All Restaurants in Katy TX',
     description: 'Browse 500+ restaurants in Katy, Texas. Filter by cuisine, price & location.',
     url: 'https://ekaty.fly.dev/discover',
-    images: ['/og-image.png'],
+    images: ['/og-image.jpg'],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Discover All Restaurants in Katy TX',
     description: 'Browse 500+ restaurants in Katy, Texas. Filter by cuisine, price & location.',
-    images: ['/og-image.png'],
+    images: ['/og-image.jpg'],
   },
   alternates: {
     canonical: 'https://ekaty.fly.dev/discover'

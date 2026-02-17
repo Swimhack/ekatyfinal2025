@@ -7,13 +7,13 @@ export const metadata = {
     title: 'Discover Your Katy Dining Personality | eKaty',
     description: 'Take our fun quiz to discover your Katy dining personality!',
     type: 'website',
-    images: ['/og-image.png'],
+    images: ['/og-image.jpg'],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Discover Your Katy Dining Personality | eKaty',
     description: 'Take our fun quiz to discover your Katy dining personality!',
-    images: ['/og-image.png'],
+    images: ['/og-image.jpg'],
   },
 }
 

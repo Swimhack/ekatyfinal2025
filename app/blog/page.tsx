@@ -11,13 +11,13 @@ export const metadata = {
   openGraph: {
     title: 'Blog - eKaty | Restaurant Discovery in Katy, Texas',
     description: 'Explore expert insights and tips on restaurants, dining, and local business in Katy, Texas from eKaty.',
-    images: ['/og-image.png'],
+    images: ['/og-image.jpg'],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Blog - eKaty | Restaurant Discovery in Katy, Texas',
     description: 'Explore expert insights and tips on restaurants, dining, and local business in Katy, Texas from eKaty.',
-    images: ['/og-image.png'],
+    images: ['/og-image.jpg'],
   },
 }
 
