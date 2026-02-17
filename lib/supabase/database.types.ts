@@ -1,184 +1,77 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+/**
+ * Shared types for the application.
+ * These match the Prisma schema output after API transformation
+ * (categories/photos are split into arrays by the API layer).
+ */
 
-export interface Database {
-  public: {
-    Tables: {
-      users: {
-        Row: {
-          id: string
-          name: string
-          email: string
-          created_at: string
-          role: 'user' | 'admin'
-          avatar_url?: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          email: string
-          created_at?: string
-          role?: 'user' | 'admin'
-          avatar_url?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          email?: string
-          created_at?: string
-          role?: 'user' | 'admin'
-          avatar_url?: string
-        }
-      }
-      restaurants: {
-        Row: {
-          id: string
-          name: string
-          address: string
-          lat: number
-          lng: number
-          phone?: string
-          website?: string
-          categories: string[]
-          hours?: Json
-          price_level: 1 | 2 | 3 | 4
-          photos: string[]
-          featured: boolean
-          source?: string
-          last_updated: string
-          created_at: string
-          rating?: number
-          review_count?: number
-        }
-        Insert: {
-          id?: string
-          name: string
-          address: string
-          lat: number
-          lng: number
-          phone?: string
-          website?: string
-          categories?: string[]
-          hours?: Json
-          price_level?: 1 | 2 | 3 | 4
-          photos?: string[]
-          featured?: boolean
-          source?: string
-          last_updated?: string
-          created_at?: string
-          rating?: number
-          review_count?: number
-        }
-        Update: {
-          id?: string
-          name?: string
-          address?: string
-          lat?: number
-          lng?: number
-          phone?: string
-          website?: string
-          categories?: string[]
-          hours?: Json
-          price_level?: 1 | 2 | 3 | 4
-          photos?: string[]
-          featured?: boolean
-          source?: string
-          last_updated?: string
-          created_at?: string
-          rating?: number
-          review_count?: number
-        }
-      }
-      reviews: {
-        Row: {
-          id: string
-          restaurant_id: string
-          user_id: string
-          rating: number
-          text?: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          restaurant_id: string
-          user_id: string
-          rating: number
-          text?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          restaurant_id?: string
-          user_id?: string
-          rating?: number
-          text?: string
-          created_at?: string
-        }
-      }
-      favorites: {
-        Row: {
-          id: string
-          user_id: string
-          restaurant_id: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          restaurant_id: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          restaurant_id?: string
-          created_at?: string
-        }
-      }
-      spins: {
-        Row: {
-          id: string
-          user_id?: string
-          restaurant_id: string
-          spin_params?: Json
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id?: string
-          restaurant_id: string
-          spin_params?: Json
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          restaurant_id?: string
-          spin_params?: Json
-          created_at?: string
-        }
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
+// Stub Database type for legacy compatibility with old Supabase files
+export type Database = any
+
+export type Restaurant = {
+  id: string
+  name: string
+  description?: string | null
+  address: string
+  city?: string
+  state?: string
+  zipCode?: string | null
+  lat: number
+  lng: number
+  latitude?: number
+  longitude?: number
+  phone?: string | null
+  website?: string | null
+  categories: string[]
+  cuisineTypes?: string[]
+  hours?: Record<string, any> | null
+  priceLevel: number
+  photos: string[]
+  featured: boolean
+  active?: boolean
+  source?: string | null
+  googlePlaceId?: string | null
+  rating?: number | null
+  reviewCount?: number
+  createdAt?: string
+  updatedAt?: string
+  distance?: number
+  _count?: {
+    reviews: number
+    favorites: number
   }
 }
 
-// Helper types
-export type Restaurant = Database['public']['Tables']['restaurants']['Row']
-export type Review = Database['public']['Tables']['reviews']['Row']
-export type User = Database['public']['Tables']['users']['Row']
-export type Favorite = Database['public']['Tables']['favorites']['Row']
-export type Spin = Database['public']['Tables']['spins']['Row']
+export type Review = {
+  id: string
+  restaurantId: string
+  userId: string
+  rating: number
+  text?: string | null
+  title?: string | null
+  photos?: string
+  createdAt: string
+}
+
+export type User = {
+  id: string
+  name: string
+  email: string
+  createdAt: string
+  role: string
+  avatarUrl?: string | null
+}
+
+export type Favorite = {
+  id: string
+  userId: string
+  restaurantId: string
+  createdAt: string
+}
+
+export type Spin = {
+  id: string
+  userId?: string | null
+  restaurantId: string
+  spinParams?: Record<string, any> | null
+  createdAt: string
+}

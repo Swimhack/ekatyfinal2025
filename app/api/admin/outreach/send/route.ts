@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/utils/rate-limiter'
 import { sendEmail } from '@/lib/email/client'
 import { replaceTemplateVariables } from '@/lib/utils/template-variables'
@@ -34,14 +35,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createAdminClient()
+    // Get current user
+    const user = await getCurrentUser()
 
-    // Get current user session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    if (!session?.user?.id) {
+    if (!user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized - session required' },
         { status: 401 }
@@ -49,8 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check rate limit (50/hour, 200/day)
-    // Check hourly limit
-    const hourlyLimit = await checkRateLimit(session.user.id, 50, 3600)
+    const hourlyLimit = await checkRateLimit(user.id, 50, 3600)
 
     if (!hourlyLimit.allowed) {
       return NextResponse.json(
@@ -64,8 +60,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check daily limit
-    const dailyLimit = await checkRateLimit(session.user.id, 200, 86400)
+    const dailyLimit = await checkRateLimit(user.id, 200, 86400)
 
     if (!dailyLimit.allowed) {
       return NextResponse.json(
@@ -80,40 +75,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch campaign details
-    const { data: campaign, error: campaignError } = await supabase
-      .from('outreach_campaigns')
-      .select('*')
-      .eq('id', campaignId)
-      .single()
+    const campaign = await prisma.outreachCampaign.findUnique({
+      where: { id: campaignId },
+    })
 
-    if (campaignError || !campaign) {
+    if (!campaign) {
       return NextResponse.json(
-        { error: 'Campaign not found', details: campaignError?.message },
+        { error: 'Campaign not found' },
         { status: 404 }
       )
     }
 
     // Fetch tier details if provided
     let tier = null
-    if (tierId || campaign.tier_showcase) {
-      const tierIdToFetch = tierId || campaign.tier_showcase
-      const { data: tierData } = await supabase
-        .from('partnership_tiers')
-        .select('*')
-        .eq('id', tierIdToFetch)
-        .single()
-      tier = tierData
+    if (tierId) {
+      tier = await prisma.partnershipTier.findUnique({
+        where: { id: tierId },
+      })
     }
 
     // Fetch leads
-    const { data: leads, error: leadsError } = await supabase
-      .from('restaurant_leads')
-      .select('*')
-      .in('id', leadIds)
+    const leads = await prisma.monetizationLead.findMany({
+      where: { id: { in: leadIds } },
+    })
 
-    if (leadsError || !leads) {
+    if (!leads || leads.length === 0) {
       return NextResponse.json(
-        { error: 'Failed to fetch leads', details: leadsError?.message },
+        { error: 'Failed to fetch leads' },
         { status: 500 }
       )
     }
@@ -127,61 +115,60 @@ export async function POST(request: NextRequest) {
       try {
         // Prepare template variables
         const variables = {
-          restaurant_name: lead.business_name,
-          contact_name: lead.contact_name,
-          cuisine: lead.cuisine_type || 'restaurant',
-          city: lead.city,
+          restaurant_name: lead.restaurantName,
+          contact_name: lead.contactName || '',
+          cuisine: '',
+          city: '',
           tier_name: tier?.name || '',
-          tier_price: tier?.monthly_price?.toString() || '',
+          tier_price: tier?.monthlyPrice?.toString() || '',
         }
 
         // Replace template variables in subject
         const subject = replaceTemplateVariables(
-          campaign.subject_template,
+          campaign.subject,
           variables,
-          false // Don't escape HTML in subject
+          false
         )
 
         // Replace template variables in body
         const emailBody = replaceTemplateVariables(
-          campaign.body_template,
+          campaign.emailTemplate,
           variables,
-          false // Plain text email
+          false
         )
 
         // Send email
         const emailResult = await sendEmail({
-          to: lead.email,
+          to: lead.contactEmail,
           subject,
-          html: emailBody.replace(/\n/g, '<br>'), // Convert newlines to HTML
+          html: emailBody.replace(/\n/g, '<br>'),
         })
 
         // Record email sent
-        await supabase.from('outreach_emails').insert({
-          campaign_id: campaignId,
-          lead_id: lead.id,
-          email_provider_id: emailResult.id || null,
-          subject,
-          sent_at: new Date().toISOString(),
+        await prisma.outreachEmail.create({
+          data: {
+            campaignId,
+            leadId: lead.id,
+            recipientEmail: lead.contactEmail,
+            recipientName: lead.contactName,
+            subject,
+            emailBody,
+            status: 'sent',
+            sentAt: new Date(),
+          },
         })
-
-        // Update lead last_contacted_at
-        await supabase
-          .from('restaurant_leads')
-          .update({ last_contacted_at: new Date().toISOString() })
-          .eq('id', lead.id)
 
         successCount++
         results.push({
           leadId: lead.id,
-          email: lead.email,
+          email: lead.contactEmail,
           status: 'sent',
         })
       } catch (error) {
         failureCount++
         results.push({
           leadId: lead.id,
-          email: lead.email,
+          email: lead.contactEmail,
           status: 'failed',
           error: error instanceof Error ? error.message : 'Unknown error',
         })
@@ -189,14 +176,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Update campaign stats
-    await supabase
-      .from('outreach_campaigns')
-      .update({
-        total_sent: (campaign.total_sent || 0) + successCount,
+    await prisma.outreachCampaign.update({
+      where: { id: campaignId },
+      data: {
         status: 'sent',
-        sent_at: new Date().toISOString(),
-      })
-      .eq('id', campaignId)
+        sentAt: new Date(),
+      },
+    })
 
     return NextResponse.json({
       message: `Sent ${successCount} emails, ${failureCount} failed`,

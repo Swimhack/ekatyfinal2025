@@ -1,10 +1,6 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
+'use client'
 
-export const metadata: Metadata = {
-  title: 'Admin Dashboard | eKaty',
-  description: 'eKaty Admin Dashboard',
-}
+import Link from 'next/link'
 
 export default function AdminLayout({
   children,

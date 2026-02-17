@@ -47,7 +47,7 @@ export default function SpinnerPageContent() {
 
     if (filters.priceLevel.length > 0) {
       filtered = filtered.filter((restaurant) =>
-        filters.priceLevel.includes(restaurant.price_level)
+        filters.priceLevel.includes(restaurant.priceLevel)
       )
     }
 

@@ -8,11 +8,13 @@ import {
   sendSubscriptionChangedEmail
 } from '@/lib/email-service'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-02-24.acacia'
-})
+const getStripe = () => {
+  return new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: '2025-02-24.acacia'
+  })
+}
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+const getWebhookSecret = () => process.env.STRIPE_WEBHOOK_SECRET || ''
 
 export async function POST(request: NextRequest) {
   const body = await request.text()
@@ -21,7 +23,7 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    event = getStripe().webhooks.constructEvent(body, signature, getWebhookSecret())
   } catch (error) {
     console.error('Webhook signature verification failed:', error)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
@@ -155,7 +157,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   if (!invoice.subscription) return
 
-  const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string)
+  const subscription = await getStripe().subscriptions.retrieve(invoice.subscription as string)
   const userId = subscription.metadata.userId
 
   if (!userId) return
@@ -202,7 +204,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
   if (!invoice.subscription) return
 
-  const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string)
+  const subscription = await getStripe().subscriptions.retrieve(invoice.subscription as string)
   const userId = subscription.metadata.userId
 
   if (!userId) return

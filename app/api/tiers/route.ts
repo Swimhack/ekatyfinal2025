@@ -1,38 +1,18 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 
-/**
- * GET /api/tiers
- * Public endpoint - List all active partnership tiers
- */
 export async function GET() {
   try {
-    const supabase = createServerClient()
-
-    const { data, error } = await supabase
-      .from('partnership_tiers')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-
-    if (error) {
-      console.error('Error fetching partnership tiers:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch partnership tiers', details: error.message },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({
-      tiers: data || [],
+    const tiers = await prisma.partnershipTier.findMany({
+      where: { isActive: true },
+      orderBy: { displayOrder: 'asc' }
     })
+
+    return NextResponse.json({ tiers: tiers || [] })
   } catch (error) {
-    console.error('Unexpected error in GET /api/tiers:', error)
+    console.error('Error fetching tiers:', error)
     return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

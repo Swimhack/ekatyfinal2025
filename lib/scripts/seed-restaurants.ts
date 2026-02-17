@@ -1,5 +1,6 @@
+// Legacy Supabase seed script - use prisma/seed-katy.ts instead
+// @ts-nocheck
 import { createClient } from '@supabase/supabase-js'
-import { Database } from '@/lib/supabase/database.types'
 import katyRestaurants from '@/lib/data/restaurants-seed'
 
 // Initialize Supabase client with service role key for admin operations

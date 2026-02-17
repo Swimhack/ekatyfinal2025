@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/admin/tiers/[id]
@@ -16,29 +16,18 @@ export async function GET(
   try {
     const { id } = params
 
-    const supabase = createAdminClient()
-    const { data, error } = await supabase
-      .from('partnership_tiers')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const tier = await prisma.partnershipTier.findUnique({
+      where: { id },
+    })
 
-    if (error) {
-      console.error('Error fetching partnership tier:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch partnership tier', details: error.message },
-        { status: error.code === 'PGRST116' ? 404 : 500 }
-      )
-    }
-
-    if (!data) {
+    if (!tier) {
       return NextResponse.json(
         { error: 'Partnership tier not found' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ tier: data })
+    return NextResponse.json({ tier })
   } catch (error) {
     console.error('Unexpected error in GET /api/admin/tiers/[id]:', error)
     return NextResponse.json(
@@ -65,28 +54,25 @@ export async function PATCH(
   try {
     const { id } = params
     const body = await request.json()
-    const { name, slug, monthly_price, features, display_order, is_active } =
-      body
+    const { name, slug, monthlyPrice, features, displayOrder, isActive } = body
 
     // Build update object with only provided fields
     const updates: any = {}
     if (name !== undefined) updates.name = name
     if (slug !== undefined) updates.slug = slug
-    if (monthly_price !== undefined) {
-      // Validate monthly_price if provided
-      if (typeof monthly_price !== 'number' || monthly_price <= 0) {
+    if (monthlyPrice !== undefined) {
+      if (typeof monthlyPrice !== 'number' || monthlyPrice <= 0) {
         return NextResponse.json(
           {
-            error: 'Invalid monthly_price',
-            details: 'monthly_price must be a positive number',
+            error: 'Invalid monthlyPrice',
+            details: 'monthlyPrice must be a positive number',
           },
           { status: 400 }
         )
       }
-      updates.monthly_price = monthly_price
+      updates.monthlyPrice = monthlyPrice
     }
     if (features !== undefined) {
-      // Validate features if provided
       if (!Array.isArray(features)) {
         return NextResponse.json(
           {
@@ -96,16 +82,12 @@ export async function PATCH(
           { status: 400 }
         )
       }
-      updates.features = features
+      updates.features = JSON.stringify(features)
     }
-    if (display_order !== undefined) updates.display_order = display_order
-    if (is_active !== undefined) updates.is_active = is_active
+    if (displayOrder !== undefined) updates.displayOrder = displayOrder
+    if (isActive !== undefined) updates.isActive = isActive
 
-    // Set updated_at timestamp
-    updates.updated_at = new Date().toISOString()
-
-    if (Object.keys(updates).length === 1) {
-      // Only updated_at was set
+    if (Object.keys(updates).length === 0) {
       return NextResponse.json(
         {
           error: 'No fields to update',
@@ -115,30 +97,19 @@ export async function PATCH(
       )
     }
 
-    const supabase = createAdminClient()
-    const { data, error } = await supabase
-      .from('partnership_tiers')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
+    const tier = await prisma.partnershipTier.update({
+      where: { id },
+      data: updates,
+    })
 
-    if (error) {
-      console.error('Error updating partnership tier:', error)
-      return NextResponse.json(
-        { error: 'Failed to update partnership tier', details: error.message },
-        { status: error.code === 'PGRST116' ? 404 : 500 }
-      )
-    }
-
-    if (!data) {
+    if (!tier) {
       return NextResponse.json(
         { error: 'Partnership tier not found' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ tier: data })
+    return NextResponse.json({ tier })
   } catch (error) {
     console.error('Unexpected error in PATCH /api/admin/tiers/[id]:', error)
     return NextResponse.json(
@@ -153,7 +124,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/admin/tiers/[id]
- * Soft delete a partnership tier (set is_active = false)
+ * Soft delete a partnership tier (set isActive = false)
  */
 export async function DELETE(
   request: NextRequest,
@@ -165,26 +136,12 @@ export async function DELETE(
   try {
     const { id } = params
 
-    const supabase = createAdminClient()
-    const { data, error } = await supabase
-      .from('partnership_tiers')
-      .update({
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single()
+    const tier = await prisma.partnershipTier.update({
+      where: { id },
+      data: { isActive: false },
+    })
 
-    if (error) {
-      console.error('Error deleting partnership tier:', error)
-      return NextResponse.json(
-        { error: 'Failed to delete partnership tier', details: error.message },
-        { status: error.code === 'PGRST116' ? 404 : 500 }
-      )
-    }
-
-    if (!data) {
+    if (!tier) {
       return NextResponse.json(
         { error: 'Partnership tier not found' },
         { status: 404 }
@@ -193,7 +150,7 @@ export async function DELETE(
 
     return NextResponse.json({
       message: 'Partnership tier deactivated successfully',
-      tier: data,
+      tier,
     })
   } catch (error) {
     console.error('Unexpected error in DELETE /api/admin/tiers/[id]:', error)

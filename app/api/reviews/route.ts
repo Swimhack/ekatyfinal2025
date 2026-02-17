@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { Database } from '@/lib/supabase/database.types'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies })
-
     // Check authentication
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    const user = await getCurrentUser()
 
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -50,13 +45,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if restaurant exists
-    const { data: restaurant, error: restaurantError } = await supabase
-      .from('restaurants')
-      .select('id')
-      .eq('id', restaurant_id)
-      .single()
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurant_id },
+      select: { id: true },
+    })
 
-    if (restaurantError || !restaurant) {
+    if (!restaurant) {
       return NextResponse.json(
         { error: 'Restaurant not found' },
         { status: 404 }
@@ -64,12 +58,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already reviewed this restaurant
-    const { data: existing } = await supabase
-      .from('reviews')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .eq('restaurant_id', restaurant_id)
-      .single()
+    const existing = await prisma.review.findUnique({
+      where: {
+        restaurantId_userId: {
+          restaurantId: restaurant_id,
+          userId: user.id,
+        },
+      },
+      select: { id: true },
+    })
 
     if (existing) {
       return NextResponse.json(
@@ -79,26 +76,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Create review
-    const { data, error } = await supabase
-      .from('reviews')
-      .insert({
-        user_id: session.user.id,
-        restaurant_id,
+    const data = await prisma.review.create({
+      data: {
+        userId: user.id,
+        restaurantId: restaurant_id,
         rating,
-        comment: comment.trim(),
-      })
-      .select(
-        `
-        *,
-        user:users (
-          full_name,
-          email
-        )
-      `
-      )
-      .single()
-
-    if (error) throw error
+        text: comment.trim(),
+        photos: '',
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
 
     return NextResponse.json({ data }, { status: 201 })
   } catch (error) {

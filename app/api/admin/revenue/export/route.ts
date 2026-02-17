@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { getActivePartnerships } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 import { formatDateForCSV, formatCurrencyForCSV } from '@/lib/utils/export'
 
 /**
@@ -12,27 +12,33 @@ export async function GET(request: NextRequest) {
   if (authResponse) return authResponse
 
   try {
-    const { data, error } = await getActivePartnerships()
-
-    if (error) {
-      console.error('Error fetching partnerships for export:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch partnerships', details: error.message },
-        { status: 500 }
-      )
-    }
+    const data = await prisma.partnership.findMany({
+      where: { status: 'active' },
+      include: {
+        restaurant: {
+          select: {
+            name: true,
+          },
+        },
+        tier: {
+          select: {
+            name: true,
+            monthlyPrice: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
 
     // Transform data for CSV export
-    const csvData = (data || []).map((partnership: any) => ({
+    const csvData = (data || []).map((partnership) => ({
       'Restaurant Name': partnership.restaurant?.name || 'Unknown',
       Tier: partnership.tier?.name || 'Unknown',
-      'Monthly Price': formatCurrencyForCSV(partnership.tier?.monthly_price || 0),
+      'Monthly Price': formatCurrencyForCSV(partnership.tier?.monthlyPrice || 0),
       Status: partnership.status,
-      'Start Date': formatDateForCSV(partnership.start_date),
-      'Renewal Date': formatDateForCSV(partnership.renewal_date),
-      'Billing Cycle': partnership.billing_cycle,
-      'Payment Status': partnership.payment_status,
-      'Last Payment': formatDateForCSV(partnership.last_payment_date),
+      'Start Date': formatDateForCSV(partnership.startDate),
+      'End Date': formatDateForCSV(partnership.endDate),
+      'Billing Cycle': partnership.billingCycle,
     }))
 
     // Generate CSV content
@@ -42,10 +48,8 @@ export async function GET(request: NextRequest) {
       'Monthly Price',
       'Status',
       'Start Date',
-      'Renewal Date',
+      'End Date',
       'Billing Cycle',
-      'Payment Status',
-      'Last Payment',
     ] as const
 
     type CSVRow = Record<string, any>

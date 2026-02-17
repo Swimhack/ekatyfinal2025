@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { prisma } from '@/lib/prisma'
 import { processWebhook } from '@/lib/email/tracking'
 
 /**
@@ -10,19 +9,19 @@ import { processWebhook } from '@/lib/email/tracking'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const supabase = createRouteHandlerClient({ cookies })
 
     // Process the webhook event
     const event = processWebhook(body)
 
-    // Find the email record by provider ID
-    const { data: email, error: emailError } = await supabase
-      .from('outreach_emails')
-      .select('id, lead_id, campaign_id')
-      .eq('email_provider_id', event.emailProviderId)
-      .single()
+    // Find the email record by searching metadata for the provider email ID
+    const email = await prisma.outreachEmail.findFirst({
+      where: {
+        metadata: { contains: event.emailProviderId || '' }
+      },
+      select: { id: true, leadId: true, campaignId: true }
+    })
 
-    if (emailError || !email) {
+    if (!email) {
       console.warn('Email record not found for provider ID:', event.emailProviderId)
       return NextResponse.json({ success: false, error: 'Email not found' }, { status: 404 })
     }
@@ -32,18 +31,19 @@ export async function POST(request: NextRequest) {
 
     switch (event.type) {
       case 'opened':
-        updates.opened_at = event.timestamp.toISOString()
+        updates.openedAt = event.timestamp
         break
       case 'clicked':
-        updates.clicked_at = event.timestamp.toISOString()
+        updates.clickedAt = event.timestamp
         break
       case 'bounced':
-        updates.bounced_at = event.timestamp.toISOString()
-        updates.bounce_reason = event.rawEvent.data.reason || 'Unknown'
+        updates.bouncedAt = event.timestamp
+        updates.bounceReason = event.rawEvent.data.reason || 'Unknown'
         break
       case 'unsubscribed':
-        updates.unsubscribed_at = event.timestamp.toISOString()
-        break
+        // No unsubscribedAt field in schema, log only
+        console.log('Unsubscribe event for email:', email.id)
+        return NextResponse.json({ success: true })
       default:
         // For other events (sent, delivered, complained), just log
         console.log('Received email event:', event.type, email.id)
@@ -51,18 +51,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Update the email record
-    const { error: updateError } = await supabase
-      .from('outreach_emails')
-      .update(updates)
-      .eq('id', email.id)
-
-    if (updateError) {
-      console.error('Error updating email record:', updateError)
-      return NextResponse.json(
-        { success: false, error: 'Update failed' },
-        { status: 500 }
-      )
-    }
+    await prisma.outreachEmail.update({
+      where: { id: email.id },
+      data: updates
+    })
 
     console.log(`Email ${event.type} event processed for email ID:`, email.id)
 

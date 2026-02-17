@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { prisma } from '@/lib/prisma'
 
 /**
  * Tracking pixel endpoint for email opens
@@ -13,18 +12,16 @@ export async function GET(
   const { emailId } = params
 
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-
     // Update the email record with opened_at timestamp (only if not already opened)
-    const { error } = await supabase
-      .from('outreach_emails')
-      .update({ opened_at: new Date().toISOString() })
-      .eq('id', emailId)
-      .is('opened_at', null)
-
-    if (error) {
-      console.error('Error tracking email open:', error)
-    }
+    await prisma.outreachEmail.updateMany({
+      where: {
+        id: emailId,
+        openedAt: null
+      },
+      data: {
+        openedAt: new Date()
+      }
+    })
   } catch (error) {
     console.error('Tracking pixel error:', error)
   }

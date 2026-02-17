@@ -47,9 +47,6 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/start-production.js ./start-production.js
 
-# Create data directory for SQLite
-RUN mkdir -p /data && chown -R nextjs:nextjs /data
-
 # Switch to non-root user
 USER nextjs
 

@@ -13,11 +13,6 @@ primary_region = 'dfw'
   NEXT_PUBLIC_APP_NAME = 'eKaty'
   NEXT_PUBLIC_APP_URL = 'https://ekaty.fly.dev'
   NODE_ENV = 'production'
-  DATABASE_URL = 'file:/data/ekaty.db'
-
-[[mounts]]
-  source = 'ekaty_data'
-  destination = '/data'
 
 [http_service]
   internal_port = 8080
@@ -42,6 +37,12 @@ primary_region = 'dfw'
     type = 'connections'
     hard_limit = 25
     soft_limit = 20
+
+# Volume mount kept for compatibility with existing machines
+# (no longer used - app connects to Neon PostgreSQL)
+[[mounts]]
+  source = "ekaty_data"
+  destination = "/data"
 
 [[vm]]
   cpu_kind = 'shared'

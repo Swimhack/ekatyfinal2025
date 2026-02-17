@@ -124,13 +124,20 @@ export async function GET(request: NextRequest) {
     // Apply final limit
     restaurants = restaurants.slice(0, limit)
     
-    // Parse string fields back to arrays for response
+    // Parse string fields and normalize for client consumption
+    const priceLevelMap: Record<string, number> = {
+      'BUDGET': 1, 'MODERATE': 2, 'UPSCALE': 3, 'PREMIUM': 4
+    }
+
     restaurants = restaurants.map(r => ({
       ...r,
+      lat: r.latitude,
+      lng: r.longitude,
       categories: r.categories ? r.categories.split(',').map((c: string) => c.trim()) : [],
       cuisineTypes: r.cuisineTypes ? r.cuisineTypes.split(',').map((c: string) => c.trim()) : [],
       photos: r.photos ? r.photos.split(',').map((p: string) => p.trim()) : [],
-      hours: r.hours ? JSON.parse(r.hours) : {}
+      hours: r.hours ? JSON.parse(r.hours) : {},
+      priceLevel: priceLevelMap[r.priceLevel] || 2,
     }))
     
     // Get total count for pagination

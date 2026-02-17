@@ -3,9 +3,11 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-02-24.acacia'
-})
+const getStripe = () => {
+  return new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: '2025-02-24.acacia'
+  })
+}
 
 // Get current subscription
 export async function GET(request: NextRequest) {
@@ -77,11 +79,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update subscription in Stripe
-    const stripeSubscription = await stripe.subscriptions.retrieve(
+    const stripeSubscription = await getStripe().subscriptions.retrieve(
       subscription.stripeSubscriptionId
     )
 
-    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+    await getStripe().subscriptions.update(subscription.stripeSubscriptionId, {
       items: [
         {
           id: stripeSubscription.items.data[0].id,
@@ -125,7 +127,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Cancel subscription in Stripe (at period end)
-    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+    await getStripe().subscriptions.update(subscription.stripeSubscriptionId, {
       cancel_at_period_end: true
     })
 

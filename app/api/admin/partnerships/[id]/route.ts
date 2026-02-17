@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/admin/partnerships/[id]
@@ -23,26 +23,13 @@ export async function GET(
       )
     }
 
-    const supabase = createAdminClient()
-    const { data: partnership, error } = await supabase
-      .from('partnerships')
-      .select(
-        `
-        *,
-        tier:partnership_tiers(*),
-        restaurant:restaurants(*)
-      `
-      )
-      .eq('id', id)
-      .single()
-
-    if (error) {
-      console.error('Error fetching partnership details:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch partnership details', details: error.message },
-        { status: 500 }
-      )
-    }
+    const partnership = await prisma.partnership.findUnique({
+      where: { id },
+      include: {
+        tier: true,
+        restaurant: true,
+      },
+    })
 
     if (!partnership) {
       return NextResponse.json(
@@ -54,25 +41,23 @@ export async function GET(
     // Format the response
     const formattedPartnership = {
       id: partnership.id,
-      restaurant_id: partnership.restaurant_id,
+      restaurant_id: partnership.restaurantId,
       restaurant_name: partnership.restaurant?.name || 'Unknown',
       restaurant_address: partnership.restaurant?.address || '',
       restaurant_city: partnership.restaurant?.city || '',
-      restaurant_cuisine: partnership.restaurant?.cuisine_type || '',
-      tier_id: partnership.tier_id,
+      restaurant_cuisine: partnership.restaurant?.cuisineTypes || '',
+      tier_id: partnership.tierId,
       tier_name: partnership.tier?.name || 'Unknown',
       tier_description: partnership.tier?.description || '',
-      monthly_price: partnership.tier?.monthly_price || 0,
-      features: partnership.tier?.features || [],
+      monthly_price: partnership.tier?.monthlyPrice || 0,
+      features: partnership.tier?.features || '[]',
       status: partnership.status,
-      start_date: partnership.start_date,
-      renewal_date: partnership.renewal_date,
-      billing_cycle: partnership.billing_cycle,
-      payment_status: partnership.payment_status,
-      last_payment_date: partnership.last_payment_date,
+      start_date: partnership.startDate,
+      end_date: partnership.endDate,
+      billing_cycle: partnership.billingCycle,
       notes: partnership.notes,
-      created_at: partnership.created_at,
-      updated_at: partnership.updated_at,
+      created_at: partnership.createdAt,
+      updated_at: partnership.updatedAt,
     }
 
     return NextResponse.json({ partnership: formattedPartnership })

@@ -1,6 +1,8 @@
 import { AuthForms } from '@/components/auth/AuthForms'
 import { Suspense } from 'react'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Sign In - eKaty',
   description: 'Sign in to your eKaty account to save favorites and access personalized features.',

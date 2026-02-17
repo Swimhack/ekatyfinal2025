@@ -49,7 +49,7 @@ export default function RestaurantCard({
 
         <p className="text-gray-600 mb-2">
           {restaurant.categories.join(', ')} •{' '}
-          {'$'.repeat(restaurant.price_level)}
+          {'$'.repeat(restaurant.priceLevel)}
         </p>
 
         <div className="flex items-center justify-between">
@@ -60,7 +60,7 @@ export default function RestaurantCard({
                   {'★'.repeat(Math.floor(restaurant.rating))}
                 </span>
                 <span className="text-gray-600 ml-1">
-                  ({restaurant.review_count || 0})
+                  ({restaurant.reviewCount || 0})
                 </span>
               </>
             ) : (

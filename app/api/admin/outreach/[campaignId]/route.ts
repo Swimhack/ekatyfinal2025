@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { getCampaignDetails } from '@/lib/supabase/admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/admin/outreach/[campaignId]
@@ -17,15 +16,14 @@ export async function GET(
   try {
     const { campaignId } = params
 
-    const { campaign, emails, error } = await getCampaignDetails(campaignId)
-
-    if (error) {
-      console.error('Error fetching campaign details:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch campaign details', details: error.message },
-        { status: 500 }
-      )
-    }
+    const campaign = await prisma.outreachCampaign.findUnique({
+      where: { id: campaignId },
+      include: {
+        emails: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    })
 
     if (!campaign) {
       return NextResponse.json(
@@ -34,8 +32,10 @@ export async function GET(
       )
     }
 
+    const { emails, ...campaignData } = campaign
+
     return NextResponse.json({
-      campaign,
+      campaign: campaignData,
       emails,
     })
   } catch (error) {
@@ -67,53 +67,39 @@ export async function PATCH(
 
     const {
       name,
-      subject_template,
-      body_template,
-      target_list,
-      tier_showcase,
+      subject,
+      emailTemplate,
+      description,
+      targetSegment,
       status,
-      scheduled_for,
+      scheduledAt,
     } = body
-
-    const supabase = createAdminClient()
 
     // Build update object with only provided fields
     const updateData: any = {}
     if (name !== undefined) updateData.name = name
-    if (subject_template !== undefined)
-      updateData.subject_template = subject_template
-    if (body_template !== undefined) updateData.body_template = body_template
-    if (target_list !== undefined) updateData.target_list = target_list
-    if (tier_showcase !== undefined) updateData.tier_showcase = tier_showcase
+    if (subject !== undefined) updateData.subject = subject
+    if (emailTemplate !== undefined) updateData.emailTemplate = emailTemplate
+    if (description !== undefined) updateData.description = description
+    if (targetSegment !== undefined)
+      updateData.targetSegment = targetSegment ? JSON.stringify(targetSegment) : null
     if (status !== undefined) updateData.status = status
-    if (scheduled_for !== undefined) updateData.scheduled_for = scheduled_for
+    if (scheduledAt !== undefined)
+      updateData.scheduledAt = scheduledAt ? new Date(scheduledAt) : null
 
-    const { data, error } = await supabase
-      .from('outreach_campaigns')
-      .update(updateData)
-      .eq('id', campaignId)
-      .select()
-      .single()
+    const campaign = await prisma.outreachCampaign.update({
+      where: { id: campaignId },
+      data: updateData,
+    })
 
-    if (error) {
-      console.error('Error updating outreach campaign:', error)
-      return NextResponse.json(
-        {
-          error: 'Failed to update outreach campaign',
-          details: error.message,
-        },
-        { status: 500 }
-      )
-    }
-
-    if (!data) {
+    if (!campaign) {
       return NextResponse.json(
         { error: 'Campaign not found' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ campaign: data })
+    return NextResponse.json({ campaign })
   } catch (error) {
     console.error('Unexpected error in PATCH /api/admin/outreach/[campaignId]:', error)
     return NextResponse.json(

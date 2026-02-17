@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+// Photo storage not available - upload/delete methods are stubs
 
 export interface PhotoUploadResult {
   success: boolean
@@ -78,46 +78,14 @@ export class PhotoService {
    * Upload photo to Supabase Storage
    */
   async uploadPhoto(file: File, restaurantId: string): Promise<PhotoUploadResult> {
-    try {
-      const supabase = createClient()
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${restaurantId}/${Date.now()}.${fileExt}`
-      
-      const { data, error } = await supabase.storage
-        .from('restaurant-photos')
-        .upload(fileName, file)
-      
-      if (error) {
-        return { success: false, error: error.message }
-      }
-      
-      const { data: publicUrl } = supabase.storage
-        .from('restaurant-photos')
-        .getPublicUrl(data.path)
-      
-      return { success: true, url: publicUrl.publicUrl }
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Upload failed' 
-      }
-    }
+    return { success: false, error: 'Photo upload not configured' }
   }
 
   /**
    * Delete photo from Supabase Storage
    */
   async deletePhoto(path: string): Promise<boolean> {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.storage
-        .from('restaurant-photos')
-        .remove([path])
-      
-      return !error
-    } catch {
-      return false
-    }
+    return false
   }
 
   /**

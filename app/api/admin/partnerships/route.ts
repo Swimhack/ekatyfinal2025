@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { getActivePartnerships } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/admin/partnerships
@@ -11,32 +11,43 @@ export async function GET(request: NextRequest) {
   if (authResponse) return authResponse
 
   try {
-    const { data, error } = await getActivePartnerships()
-
-    if (error) {
-      console.error('Error fetching partnerships:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch partnerships', details: error.message },
-        { status: 500 }
-      )
-    }
+    const data = await prisma.partnership.findMany({
+      where: { status: 'active' },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            cuisineTypes: true,
+          },
+        },
+        tier: {
+          select: {
+            id: true,
+            name: true,
+            monthlyPrice: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
 
     // Transform data to include flattened tier and restaurant details
-    const partnerships = (data || []).map((partnership: any) => ({
+    const partnerships = (data || []).map((partnership) => ({
       id: partnership.id,
-      restaurant_id: partnership.restaurant_id,
+      restaurant_id: partnership.restaurantId,
       restaurant_name: partnership.restaurant?.name || 'Unknown',
-      tier_id: partnership.tier_id,
+      tier_id: partnership.tierId,
       tier_name: partnership.tier?.name || 'Unknown',
-      monthly_price: partnership.tier?.monthly_price || 0,
+      monthly_price: partnership.tier?.monthlyPrice || 0,
       status: partnership.status,
-      start_date: partnership.start_date,
-      renewal_date: partnership.renewal_date,
-      billing_cycle: partnership.billing_cycle,
-      payment_status: partnership.payment_status,
-      last_payment_date: partnership.last_payment_date,
-      created_at: partnership.created_at,
-      updated_at: partnership.updated_at,
+      start_date: partnership.startDate,
+      end_date: partnership.endDate,
+      billing_cycle: partnership.billingCycle,
+      created_at: partnership.createdAt,
+      updated_at: partnership.updatedAt,
     }))
 
     return NextResponse.json({

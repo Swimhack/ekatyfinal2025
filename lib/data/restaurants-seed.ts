@@ -1,7 +1,21 @@
-import { Database } from '@/lib/supabase/database.types'
 import { getRestaurantPhotos } from './restaurant-photos'
 
-type RestaurantInsert = Database['public']['Tables']['restaurants']['Insert']
+type RestaurantInsert = {
+  name: string
+  address: string
+  lat: number
+  lng: number
+  phone?: string
+  website?: string
+  categories?: string[]
+  hours?: any
+  price_level?: number
+  photos?: string[]
+  featured?: boolean
+  source?: string
+  rating?: number
+  review_count?: number
+}
 
 export const katyRestaurants: Omit<RestaurantInsert, 'id' | 'created_at' | 'last_updated'>[] = [
   // Mexican Restaurants

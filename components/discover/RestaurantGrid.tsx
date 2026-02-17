@@ -45,7 +45,7 @@ export function RestaurantGrid() {
       case 'name':
         return a.name.localeCompare(b.name)
       case 'price':
-        return a.price_level - b.price_level
+        return a.priceLevel - b.priceLevel
       case 'rating':
       default:
         return (b.rating || 0) - (a.rating || 0)
@@ -135,7 +135,7 @@ export function RestaurantGrid() {
               {restaurant.name}
             </h3>
             <p className="text-gray-600 mb-2">
-              {restaurant.categories.join(', ')} • {'$'.repeat(restaurant.price_level)}
+              {restaurant.categories.join(', ')} • {'$'.repeat(restaurant.priceLevel)}
             </p>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -145,7 +145,7 @@ export function RestaurantGrid() {
                       {'★'.repeat(Math.floor(restaurant.rating))}
                     </span>
                     <span className="text-gray-600 ml-1">
-                      ({restaurant.review_count || 0})
+                      ({restaurant.reviewCount || 0})
                     </span>
                   </>
                 ) : (

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/admin/tiers
@@ -14,28 +14,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get('include_inactive') === 'true'
 
-    const supabase = createAdminClient()
-    let query = supabase
-      .from('partnership_tiers')
-      .select('*')
-      .order('display_order', { ascending: true })
-
-    if (!includeInactive) {
-      query = query.eq('is_active', true)
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      console.error('Error fetching partnership tiers:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch partnership tiers', details: error.message },
-        { status: 500 }
-      )
-    }
+    const tiers = await prisma.partnershipTier.findMany({
+      where: includeInactive ? undefined : { isActive: true },
+      orderBy: { displayOrder: 'asc' },
+    })
 
     return NextResponse.json({
-      tiers: data || [],
+      tiers: tiers || [],
     })
   } catch (error) {
     console.error('Unexpected error in GET /api/admin/tiers:', error)
@@ -62,29 +47,29 @@ export async function POST(request: NextRequest) {
     const {
       name,
       slug,
-      monthly_price,
+      monthlyPrice,
       features,
-      display_order = 0,
-      is_active = true,
+      displayOrder = 0,
+      isActive = true,
     } = body
 
     // Validation
-    if (!name || !slug || monthly_price === undefined || !features) {
+    if (!name || !slug || monthlyPrice === undefined || !features) {
       return NextResponse.json(
         {
           error: 'Missing required fields',
-          details: 'name, slug, monthly_price, and features are required',
+          details: 'name, slug, monthlyPrice, and features are required',
         },
         { status: 400 }
       )
     }
 
-    // Validate monthly_price is positive
-    if (typeof monthly_price !== 'number' || monthly_price <= 0) {
+    // Validate monthlyPrice is positive
+    if (typeof monthlyPrice !== 'number' || monthlyPrice <= 0) {
       return NextResponse.json(
         {
-          error: 'Invalid monthly_price',
-          details: 'monthly_price must be a positive number',
+          error: 'Invalid monthlyPrice',
+          details: 'monthlyPrice must be a positive number',
         },
         { status: 400 }
       )
@@ -101,29 +86,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createAdminClient()
-    const { data, error } = await supabase
-      .from('partnership_tiers')
-      .insert({
+    const tier = await prisma.partnershipTier.create({
+      data: {
         name,
         slug,
-        monthly_price,
-        features,
-        display_order,
-        is_active,
-      })
-      .select()
-      .single()
+        monthlyPrice,
+        features: JSON.stringify(features),
+        displayOrder,
+        isActive,
+      },
+    })
 
-    if (error) {
-      console.error('Error creating partnership tier:', error)
-      return NextResponse.json(
-        { error: 'Failed to create partnership tier', details: error.message },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ tier: data }, { status: 201 })
+    return NextResponse.json({ tier }, { status: 201 })
   } catch (error) {
     console.error('Unexpected error in POST /api/admin/tiers:', error)
     return NextResponse.json(

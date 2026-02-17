@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { getLeadDetails } from '@/lib/supabase/admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/admin/leads/[id]
@@ -17,23 +16,24 @@ export async function GET(
   try {
     const { id } = params
 
-    const { lead, emails, error } = await getLeadDetails(id)
-
-    if (error) {
-      console.error('Error fetching lead details:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch lead details', details: error.message },
-        { status: 500 }
-      )
-    }
+    const lead = await prisma.monetizationLead.findUnique({
+      where: { id },
+      include: {
+        outreachEmails: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    })
 
     if (!lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
 
+    const { outreachEmails, ...leadData } = lead
+
     return NextResponse.json({
-      lead,
-      emails,
+      lead: leadData,
+      emails: outreachEmails,
     })
   } catch (error) {
     console.error('Unexpected error in GET /api/admin/leads/[id]:', error)
@@ -63,52 +63,33 @@ export async function PATCH(
     const body = await request.json()
 
     const {
-      business_name,
-      contact_name,
-      email,
-      phone,
-      address,
-      city,
-      cuisine_type,
+      contactName,
+      contactEmail,
+      contactPhone,
+      restaurantName,
+      tier,
       status,
-      assigned_to,
-      last_contacted_at,
+      assignedToId,
       notes,
       source,
     } = body
 
-    const supabase = createAdminClient()
-
     // Build update object with only provided fields
     const updateData: any = {}
-    if (business_name !== undefined) updateData.business_name = business_name
-    if (contact_name !== undefined) updateData.contact_name = contact_name
-    if (email !== undefined) updateData.email = email
-    if (phone !== undefined) updateData.phone = phone
-    if (address !== undefined) updateData.address = address
-    if (city !== undefined) updateData.city = city
-    if (cuisine_type !== undefined) updateData.cuisine_type = cuisine_type
+    if (contactName !== undefined) updateData.contactName = contactName
+    if (contactEmail !== undefined) updateData.contactEmail = contactEmail
+    if (contactPhone !== undefined) updateData.contactPhone = contactPhone
+    if (restaurantName !== undefined) updateData.restaurantName = restaurantName
+    if (tier !== undefined) updateData.tier = tier
     if (status !== undefined) updateData.status = status
-    if (assigned_to !== undefined) updateData.assigned_to = assigned_to
-    if (last_contacted_at !== undefined)
-      updateData.last_contacted_at = last_contacted_at
+    if (assignedToId !== undefined) updateData.assignedToId = assignedToId
     if (notes !== undefined) updateData.notes = notes
     if (source !== undefined) updateData.source = source
 
-    const { data, error } = await supabase
-      .from('restaurant_leads')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error updating restaurant lead:', error)
-      return NextResponse.json(
-        { error: 'Failed to update restaurant lead', details: error.message },
-        { status: 500 }
-      )
-    }
+    const data = await prisma.monetizationLead.update({
+      where: { id },
+      data: updateData,
+    })
 
     if (!data) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })

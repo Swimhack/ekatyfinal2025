@@ -22,7 +22,7 @@ export default function RestaurantsGrid({
       case 'name':
         return a.name.localeCompare(b.name)
       case 'price':
-        return a.price_level - b.price_level
+        return a.priceLevel - b.priceLevel
       case 'rating':
       default:
         return (b.rating || 0) - (a.rating || 0)

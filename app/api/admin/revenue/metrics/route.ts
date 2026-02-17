@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { getRevenueMetrics } from '@/lib/supabase/admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 /**
  * Calculate MRR trend for the last 6 months
  */
 async function calculateMRRTrend() {
-  const supabase = createAdminClient()
   const now = new Date()
   const trends = []
 
@@ -17,40 +15,35 @@ async function calculateMRRTrend() {
     const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
 
     // Get partnerships that were active during this month
-    const { data: partnerships, error } = await supabase
-      .from('partnerships')
-      .select(
-        `
-        *,
-        tier:partnership_tiers(monthly_price)
-      `
-      )
-      .lte('start_date', nextMonth.toISOString().split('T')[0])
-      .or(
-        `renewal_date.gte.${targetDate.toISOString().split('T')[0]},status.eq.active`
-      )
-
-    if (error) {
-      console.error('Error calculating MRR trend:', error)
-      continue
-    }
+    const partnerships = await prisma.partnership.findMany({
+      where: {
+        startDate: { lt: nextMonth },
+        OR: [
+          { status: 'active' },
+          { endDate: { gte: targetDate } },
+        ],
+      },
+      include: {
+        tier: {
+          select: { monthlyPrice: true },
+        },
+      },
+    })
 
     // Filter partnerships that were actually active in this month
-    const activePartnerships = (partnerships || []).filter((p: any) => {
-      const startDate = new Date(p.start_date)
-      const renewalDate = new Date(p.renewal_date)
+    const activePartnerships = partnerships.filter((p) => {
+      const startDate = new Date(p.startDate)
+      const endDate = p.endDate ? new Date(p.endDate) : null
 
-      // Partnership started before or during this month AND
-      // (is still active OR renewal date is after this month)
       return (
         startDate <= nextMonth &&
-        (p.status === 'active' || renewalDate >= targetDate)
+        (p.status === 'active' || (endDate && endDate >= targetDate))
       )
     })
 
     // Calculate MRR for this month
-    const monthlyMRR = activePartnerships.reduce((sum: number, p: any) => {
-      return sum + (p.tier?.monthly_price || 0)
+    const monthlyMRR = activePartnerships.reduce((sum: number, p) => {
+      return sum + (p.tier?.monthlyPrice || 0)
     }, 0)
 
     trends.push({
@@ -83,27 +76,70 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get revenue metrics for the period
-    const { data: metrics, error } = await getRevenueMetrics(period)
+    // Calculate date range based on period
+    const now = new Date()
+    let startDate: Date
+    if (period === 'month') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+    } else if (period === 'quarter') {
+      const quarterMonth = Math.floor(now.getMonth() / 3) * 3
+      startDate = new Date(now.getFullYear(), quarterMonth, 1)
+    } else {
+      startDate = new Date(now.getFullYear(), 0, 1)
+    }
 
-    if (error || !metrics) {
-      console.error('Error fetching revenue metrics:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch revenue metrics', details: error?.message },
-        { status: 500 }
-      )
+    // Get active partnerships with tier info
+    const activePartnerships = await prisma.partnership.findMany({
+      where: { status: 'active' },
+      include: {
+        tier: {
+          select: { id: true, name: true, monthlyPrice: true },
+        },
+      },
+    })
+
+    // Get new partnerships in period
+    const newPartnerships = await prisma.partnership.count({
+      where: {
+        startDate: { gte: startDate },
+      },
+    })
+
+    // Get churned partnerships in period
+    const churnedPartnerships = await prisma.partnership.count({
+      where: {
+        status: { in: ['canceled', 'expired'] },
+        updatedAt: { gte: startDate },
+      },
+    })
+
+    // Calculate MRR
+    const totalMrr = activePartnerships.reduce(
+      (sum, p) => sum + (p.tier?.monthlyPrice || 0),
+      0
+    )
+
+    // Partnerships by tier
+    const partnershipsByTier: Record<string, { count: number; revenue: number }> = {}
+    for (const p of activePartnerships) {
+      const tierName = p.tier?.name || 'Unknown'
+      if (!partnershipsByTier[tierName]) {
+        partnershipsByTier[tierName] = { count: 0, revenue: 0 }
+      }
+      partnershipsByTier[tierName].count++
+      partnershipsByTier[tierName].revenue += p.tier?.monthlyPrice || 0
     }
 
     // Calculate MRR trend for last 6 months
     const mrrTrend = await calculateMRRTrend()
 
     return NextResponse.json({
-      period: metrics.period,
-      total_mrr: metrics.total_mrr,
-      active_partnerships: metrics.active_partnerships,
-      new_partnerships: metrics.new_partnerships,
-      churned_partnerships: metrics.churned_partnerships,
-      partnerships_by_tier: metrics.partnerships_by_tier,
+      period,
+      total_mrr: totalMrr,
+      active_partnerships: activePartnerships.length,
+      new_partnerships: newPartnerships,
+      churned_partnerships: churnedPartnerships,
+      partnerships_by_tier: partnershipsByTier,
       mrr_trend: mrrTrend,
     })
   } catch (error) {

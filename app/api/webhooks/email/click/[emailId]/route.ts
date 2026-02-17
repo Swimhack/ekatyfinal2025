@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { prisma } from '@/lib/prisma'
 
 /**
  * Tracking endpoint for email link clicks
@@ -22,18 +21,16 @@ export async function GET(
   }
 
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-
     // Update the email record with clicked_at timestamp (only if not already clicked)
-    const { error } = await supabase
-      .from('outreach_emails')
-      .update({ clicked_at: new Date().toISOString() })
-      .eq('id', emailId)
-      .is('clicked_at', null)
-
-    if (error) {
-      console.error('Error tracking email click:', error)
-    }
+    await prisma.outreachEmail.updateMany({
+      where: {
+        id: emailId,
+        clickedAt: null
+      },
+      data: {
+        clickedAt: new Date()
+      }
+    })
   } catch (error) {
     console.error('Click tracking error:', error)
   }

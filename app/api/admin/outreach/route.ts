@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { getOutreachCampaigns } from '@/lib/supabase/admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * GET /api/admin/outreach
@@ -15,21 +15,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || undefined
 
-    const { data, error } = await getOutreachCampaigns(status)
-
-    if (error) {
-      console.error('Error fetching outreach campaigns:', error)
-      return NextResponse.json(
-        {
-          error: 'Failed to fetch outreach campaigns',
-          details: error.message,
+    const campaigns = await prisma.outreachCampaign.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: { emails: true },
         },
-        { status: 500 }
-      )
-    }
+      },
+    })
 
     return NextResponse.json({
-      campaigns: data || [],
+      campaigns: campaigns || [],
     })
   } catch (error) {
     console.error('Unexpected error in GET /api/admin/outreach:', error)
@@ -55,65 +52,49 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       name,
-      subject_template,
-      body_template,
-      target_list,
-      tier_showcase,
+      subject,
+      emailTemplate,
+      description,
+      targetSegment,
       status = 'draft',
-      scheduled_for,
+      scheduledAt,
     } = body
 
     // Validation
-    if (!name || !subject_template || !body_template) {
+    if (!name || !subject || !emailTemplate) {
       return NextResponse.json(
         {
           error: 'Missing required fields',
-          details: 'name, subject_template, and body_template are required',
+          details: 'name, subject, and emailTemplate are required',
         },
         { status: 400 }
       )
     }
 
-    // Get the current user session for created_by
-    const supabase = createAdminClient()
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    // Get the current user
+    const user = await getCurrentUser()
 
-    if (!session?.user?.id) {
+    if (!user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized - session required' },
         { status: 401 }
       )
     }
 
-    const { data, error } = await supabase
-      .from('outreach_campaigns')
-      .insert({
+    const campaign = await prisma.outreachCampaign.create({
+      data: {
         name,
-        created_by: session.user.id,
-        subject_template,
-        body_template,
-        target_list: target_list || [],
-        tier_showcase: tier_showcase || null,
+        subject,
+        emailTemplate,
+        description: description || null,
+        targetSegment: targetSegment ? JSON.stringify(targetSegment) : null,
         status,
-        scheduled_for: scheduled_for || null,
-      })
-      .select()
-      .single()
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        createdBy: user.id,
+      },
+    })
 
-    if (error) {
-      console.error('Error creating outreach campaign:', error)
-      return NextResponse.json(
-        {
-          error: 'Failed to create outreach campaign',
-          details: error.message,
-        },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ campaign: data }, { status: 201 })
+    return NextResponse.json({ campaign }, { status: 201 })
   } catch (error) {
     console.error('Unexpected error in POST /api/admin/outreach:', error)
     return NextResponse.json(

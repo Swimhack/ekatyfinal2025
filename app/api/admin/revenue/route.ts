@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { createAdminClient, getRevenueMetrics } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   const adminError = await requireAdmin(request)
@@ -21,18 +21,72 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const result = await getRevenueMetrics(period as 'month' | 'quarter' | 'year')
+    // Calculate date range based on period
+    const now = new Date()
+    let startDate: Date
+    if (period === 'month') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+    } else if (period === 'quarter') {
+      const quarterMonth = Math.floor(now.getMonth() / 3) * 3
+      startDate = new Date(now.getFullYear(), quarterMonth, 1)
+    } else {
+      startDate = new Date(now.getFullYear(), 0, 1)
+    }
 
-    if (result.error || !result.data) {
-      return NextResponse.json(
-        { error: 'Failed to fetch revenue metrics' },
-        { status: 500 }
-      )
+    // Get active partnerships with tier info
+    const activePartnerships = await prisma.partnership.findMany({
+      where: { status: 'active' },
+      include: {
+        tier: {
+          select: { id: true, name: true, monthlyPrice: true },
+        },
+      },
+    })
+
+    // Get new partnerships in period
+    const newPartnerships = await prisma.partnership.count({
+      where: {
+        startDate: { gte: startDate },
+      },
+    })
+
+    // Get churned partnerships in period
+    const churnedPartnerships = await prisma.partnership.count({
+      where: {
+        status: { in: ['canceled', 'expired'] },
+        updatedAt: { gte: startDate },
+      },
+    })
+
+    // Calculate MRR
+    const totalMrr = activePartnerships.reduce(
+      (sum, p) => sum + (p.tier?.monthlyPrice || 0),
+      0
+    )
+
+    // Partnerships by tier
+    const partnershipsByTier: Record<string, { count: number; revenue: number }> = {}
+    for (const p of activePartnerships) {
+      const tierName = p.tier?.name || 'Unknown'
+      if (!partnershipsByTier[tierName]) {
+        partnershipsByTier[tierName] = { count: 0, revenue: 0 }
+      }
+      partnershipsByTier[tierName].count++
+      partnershipsByTier[tierName].revenue += p.tier?.monthlyPrice || 0
+    }
+
+    const data = {
+      period,
+      total_mrr: totalMrr,
+      active_partnerships: activePartnerships.length,
+      new_partnerships: newPartnerships,
+      churned_partnerships: churnedPartnerships,
+      partnerships_by_tier: partnershipsByTier,
     }
 
     // If CSV format is requested
     if (format === 'csv') {
-      const csv = generateRevenueCSV(result.data)
+      const csv = generateRevenueCSV(data)
       const today = new Date().toISOString().split('T')[0]
 
       return new NextResponse(csv, {
@@ -46,7 +100,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        data: result.data,
+        data,
         period,
       },
       { status: 200 }
@@ -78,13 +132,13 @@ function generateRevenueCSV(data: any): string {
   // Tier breakdown header
   rows.push('')
   rows.push('Tier Breakdown')
-  rows.push('Tier ID,Partnership Count,Revenue')
+  rows.push('Tier,Partnership Count,Revenue')
 
   // Tier data
-  for (const [tierId, tierData] of Object.entries(data.partnerships_by_tier)) {
+  for (const [tierName, tierData] of Object.entries(data.partnerships_by_tier)) {
     const tier = tierData as any
     rows.push(
-      `${escapeCSVField(tierId)},${tier.count},${tier.revenue.toFixed(2)}`
+      `${escapeCSVField(tierName)},${tier.count},${tier.revenue.toFixed(2)}`
     )
   }
 
@@ -103,7 +157,7 @@ function escapeCSVField(field: any): string {
 
   // If field contains comma, quote, or newline, wrap in quotes and escape quotes
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"` // Escape quotes by doubling them
+    return `"${str.replace(/"/g, '""')}"`
   }
 
   return str

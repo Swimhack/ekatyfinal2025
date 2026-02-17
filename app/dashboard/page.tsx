@@ -1,9 +1,9 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { Database } from '@/lib/supabase/database.types'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
 import RestaurantsGrid from '@/components/restaurants/RestaurantsGrid'
 import Link from 'next/link'
+import { Restaurant } from '@/lib/supabase/database.types'
 
 export const metadata = {
   title: 'My Dashboard - eKaty',
@@ -11,63 +11,63 @@ export const metadata = {
 }
 
 export default async function DashboardPage() {
-  const supabase = createServerComponentClient<Database>({ cookies })
-
   // Check authentication
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const user = await getCurrentUser()
 
-  if (!session) {
+  if (!user) {
     redirect('/auth?redirect=/dashboard')
   }
 
   // Fetch user's favorites
-  const { data: favorites } = await supabase
-    .from('favorites')
-    .select(
-      `
-      restaurant:restaurants (
-        id,
-        name,
-        description,
-        address,
-        city,
-        categories,
-        price_level,
-        rating,
-        review_count,
-        phone,
-        website,
-        photo_urls
-      )
-    `
-    )
-    .eq('user_id', session.user.id)
-    .order('created_at', { ascending: false })
-    .limit(6)
+  const favorites = await prisma.favorite.findMany({
+    where: { userId: user.id },
+    include: {
+      restaurant: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 6,
+  })
 
   // Fetch user's reviews
-  const { data: reviews } = await supabase
-    .from('reviews')
-    .select(
-      `
-      id,
-      rating,
-      comment,
-      created_at,
-      restaurant:restaurants (
-        id,
-        name
-      )
-    `
-    )
-    .eq('user_id', session.user.id)
-    .order('created_at', { ascending: false })
-    .limit(5)
+  const reviews = await prisma.review.findMany({
+    where: { userId: user.id },
+    include: {
+      restaurant: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+  })
 
-  const favoriteRestaurants =
-    favorites?.map((fav: any) => fav.restaurant).filter(Boolean) ?? []
+  const priceLevelMap: Record<string, number> = {
+    'BUDGET': 1, 'MODERATE': 2, 'UPSCALE': 3, 'PREMIUM': 4
+  }
+
+  const favoriteRestaurants: Restaurant[] =
+    favorites?.map((fav) => {
+      const r = fav.restaurant
+      return {
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        address: r.address,
+        city: r.city,
+        lat: r.latitude,
+        lng: r.longitude,
+        phone: r.phone,
+        website: r.website,
+        categories: r.categories ? r.categories.split(',').map(c => c.trim()) : [],
+        priceLevel: priceLevelMap[r.priceLevel] || 2,
+        photos: r.photos ? r.photos.split(',').map(p => p.trim()) : [],
+        featured: r.featured,
+        rating: r.rating,
+        reviewCount: r.reviewCount,
+      }
+    }).filter(Boolean) ?? []
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -96,10 +96,10 @@ export default async function DashboardPage() {
           </div>
           <div className="card text-center">
             <div className="text-3xl font-bold text-brand-600 mb-1">
-              {session.user.email?.charAt(0).toUpperCase() || '👤'}
+              {user.email?.charAt(0).toUpperCase() || '?'}
             </div>
             <div className="text-sm text-gray-600 truncate">
-              {session.user.email}
+              {user.email}
             </div>
           </div>
         </div>
@@ -147,7 +147,7 @@ export default async function DashboardPage() {
           {reviews && reviews.length > 0 ? (
             <div className="card">
               <div className="space-y-4">
-                {reviews.map((review: any) => (
+                {reviews.map((review) => (
                   <div
                     key={review.id}
                     className="pb-4 border-b border-gray-200 last:border-b-0 last:pb-0"
@@ -165,9 +165,9 @@ export default async function DashboardPage() {
                         </span>
                       </div>
                     </div>
-                    <p className="text-gray-700 text-sm mb-1">{review.comment}</p>
+                    <p className="text-gray-700 text-sm mb-1">{review.text}</p>
                     <p className="text-xs text-gray-500">
-                      {new Date(review.created_at).toLocaleDateString('en-US', {
+                      {new Date(review.createdAt).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',

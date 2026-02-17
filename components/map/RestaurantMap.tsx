@@ -252,7 +252,7 @@ export default function RestaurantMap({ restaurants, filters }: RestaurantMapPro
                         {selectedRestaurant.rating.toFixed(1)}
                       </span>
                       <span className="ml-1">
-                        ({selectedRestaurant.review_count || 0})
+                        ({selectedRestaurant.reviewCount || 0})
                       </span>
                     </>
                   ) : (
@@ -262,7 +262,7 @@ export default function RestaurantMap({ restaurants, filters }: RestaurantMapPro
 
                 <div className="flex items-center text-gray-600">
                   <DollarSign size={16} className="text-green-500 mr-1" />
-                  <span>{'$'.repeat(selectedRestaurant.price_level)}</span>
+                  <span>{'$'.repeat(selectedRestaurant.priceLevel)}</span>
                 </div>
               </div>
 
