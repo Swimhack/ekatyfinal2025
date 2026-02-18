@@ -11,6 +11,54 @@ function daysAgo(n: number): Date {
 
 const articles = [
   {
+    title: 'eKaty Launch Celebration: Flyers, Deals, Giveaways — Join the Buzz!',
+    slug: 'ekaty-launch-celebration-flyers-deals-giveaways-join-the-buzz',
+    metaDescription: 'eKaty is officially live! Celebrate the launch with free giveaways, exclusive restaurant coupons, downloadable flyers, and early adopter deals across Katy, Texas.',
+    keywords: 'eKaty launch, Katy Texas restaurants, restaurant giveaways Katy, Katy coupons, eKaty deals, Katy food app, Katy dining deals',
+    publishedDate: daysAgo(0),
+    content: `<p>After twenty years of raising a family in Katy, Texas, I've watched this city transform from a quiet suburb into one of the most vibrant communities in the Houston metro. And through all of that growth, one thing has stayed constant: we love to eat. That's why I built <strong>eKaty</strong> — a free platform to help Katy families discover the best restaurants in our community.</p>
+
+<p>Today, eKaty is officially live, and we're celebrating with a launch week packed with giveaways, coupons, downloadable flyers, and exclusive early adopter deals. Here's everything you need to know.</p>
+
+<h2>🎁 Win Free Meals — Launch Giveaway</h2>
+
+<p>We're giving away <strong>$500 in restaurant gift cards</strong> to Katy families during launch week. Entering is free and takes about 30 seconds. Just click the "Giveaways" button on the homepage, fill in your name and email, and you're in. Winners will be drawn at the end of launch week and notified by email. No purchase necessary, no catch. We just want to celebrate with you.</p>
+
+<h2>🎫 Exclusive Launch Coupons</h2>
+
+<p>We've partnered with participating Katy restaurants to offer <strong>limited-time launch coupons</strong> — think 20% off your next meal at some of our favorite local spots. These aren't generic coupon-book deals. They're exclusive to eKaty users during launch week, and quantities are limited. Click "Coupons" on the homepage to see what's available, grab a code, and use it at checkout. First come, first served.</p>
+
+<h2>📄 Download & Share — Launch Flyers</h2>
+
+<p>Want to help spread the word? We've created <strong>free downloadable flyers and social media graphics</strong> you can share with friends, neighbors, and your HOA. Whether you want to post on Nextdoor, pin something at the community center, or share on Instagram, we've got you covered. Printable PDFs, social-sized graphics for Instagram and Facebook — all free, all ready to download from the "Flyers" button on the homepage.</p>
+
+<h2>⭐ Early Adopter Deals</h2>
+
+<p>Be among the first to explore eKaty and you'll get <strong>early access to new features</strong> as we roll them out — including family-friendly restaurant filters, kids-eat-free alerts, and exclusive deals from local restaurants. Early adopters help shape what eKaty becomes. Your feedback matters, and we reward it.</p>
+
+<h2>What Is eKaty?</h2>
+
+<p>eKaty is a free restaurant discovery platform built specifically for Katy, Texas. We feature over 300 local restaurants with honest descriptions, real photos, and tools like <strong>Grub Roulette</strong> (can't decide where to eat? let us spin the wheel), an <strong>interactive map</strong>, and <strong>category browsing</strong> so you can find exactly what you're craving.</p>
+
+<p>This isn't a corporate directory. It's built by a Katy family, for Katy families. Every restaurant on eKaty has been personally reviewed and described. No paid rankings, no sponsored listings at the top. Just honest recommendations from someone who's been eating his way through this city for two decades.</p>
+
+<h2>How to Get Involved</h2>
+
+<p>Here's how to make the most of launch week:</p>
+
+<ol>
+<li><strong>Enter the giveaway</strong> — it's free and takes 30 seconds</li>
+<li><strong>Grab a coupon</strong> — limited quantities, first come first served</li>
+<li><strong>Share a flyer</strong> — help your neighbors discover eKaty</li>
+<li><strong>Explore the platform</strong> — try <a href="/spinner">Grub Roulette</a>, browse the <a href="/map">map</a>, or <a href="/discover">discover restaurants</a></li>
+<li><strong>Tell a friend</strong> — the best way to support a local project is word of mouth</li>
+</ol>
+
+<p>Katy's food scene deserves a platform that matches its energy. eKaty is that platform. Welcome aboard.</p>
+
+<p><em>— James Strickland, Katy resident since 2005</em></p>`,
+  },
+  {
     title: 'Why Cinco Ranch Blvd Is Katy\'s Best Restaurant Row',
     slug: 'why-cinco-ranch-blvd-is-katys-best-restaurant-row',
     metaDescription: 'Discover why Cinco Ranch Blvd at LaCenterra has become Katy\'s premier dining destination, from Perry\'s Steakhouse to Dish Society.',

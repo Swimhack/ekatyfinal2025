@@ -26,6 +26,11 @@ async function main() {
     await exec('npx prisma db push --accept-data-loss --skip-generate')
     console.log('Schema synchronized!')
 
+    // Seed blog articles (upsert — safe to run repeatedly)
+    console.log('Seeding blog articles...')
+    await exec('npx ts-node prisma/seed-blog-articles.ts')
+    console.log('Blog articles seeded!')
+
     // Start the Next.js server
     console.log('Starting Next.js server...')
     await exec('npm run start')
