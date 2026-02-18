@@ -57,7 +57,7 @@ function convertOpeningHours(openingHours?: any): string {
 
 // Extract categories from Google types
 // Also includes cuisine-based categories for better filtering
-function extractCategories(types?: string[], name?: string): string {
+function extractCategories(types?: string[], name?: string, editorialSummary?: string): string {
   const categories = new Set<string>();
   
   if (types && types.length > 0) {
@@ -78,33 +78,86 @@ function extractCategories(types?: string[], name?: string): string {
     });
   }
 
-  // Also add cuisine-based categories from name for better discoverability
-  // This ensures categories like "BBQ" appear in both categories and cuisineTypes
-  if (name) {
+  // Also add cuisine-based categories from name + editorial summary for better discoverability
+  if (name || editorialSummary) {
     const cuisineCategoryMap: { [key: string]: string } = {
       'bbq': 'BBQ',
       'barbecue': 'BBQ',
       'mexican': 'Mexican',
+      'taqueria': 'Mexican',
+      'taco': 'Mexican',
+      'tex-mex': 'Mexican',
       'italian': 'Italian',
+      'pizza': 'Italian',
+      'pasta': 'Italian',
       'chinese': 'Chinese',
+      'wok': 'Chinese',
+      'dim sum': 'Chinese',
       'japanese': 'Japanese',
+      'sushi': 'Japanese',
+      'ramen': 'Japanese',
+      'hibachi': 'Japanese',
+      'korean': 'Korean',
       'thai': 'Thai',
       'vietnamese': 'Vietnamese',
+      'pho': 'Vietnamese',
       'indian': 'Indian',
+      'tandoori': 'Indian',
       'greek': 'Greek',
+      'mediterranean': 'Mediterranean',
+      'shawarma': 'Mediterranean',
+      'falafel': 'Mediterranean',
       'seafood': 'Seafood',
+      'crawfish': 'Seafood',
+      'cajun': 'Cajun',
+      'creole': 'Cajun',
+      'southern': 'Southern',
+      'soul food': 'Southern',
       'breakfast': 'Breakfast',
-      'sushi': 'Japanese',
-      'pizza': 'Italian',
+      'brunch': 'Breakfast',
+      'waffle': 'Breakfast',
+      'pancake': 'Breakfast',
       'burger': 'American',
-      'steakhouse': 'American',
-      'tex-mex': 'Mexican',
+      'steakhouse': 'Steakhouse',
+      'steak house': 'Steakhouse',
+      'wings': 'American',
+      'chicken': 'American',
+      'hot dog': 'American',
+      'sandwich': 'American',
+      'deli': 'Deli',
+      'sub': 'Deli',
       'asian': 'Asian',
+      'filipino': 'Asian',
+      'hawaiian': 'Hawaiian',
+      'poke': 'Hawaiian',
+      'brazilian': 'Brazilian',
+      'peruvian': 'Peruvian',
+      'cuban': 'Cuban',
+      'colombian': 'Latin American',
+      'venezuelan': 'Latin American',
+      'salvadoran': 'Latin American',
+      'honduran': 'Latin American',
+      'ethiopian': 'Ethiopian',
+      'lebanese': 'Lebanese',
+      'turkish': 'Turkish',
+      'pakistani': 'Pakistani',
+      'nepali': 'Nepali',
+      'halal': 'Halal',
+      'vegan': 'Vegan',
+      'vegetarian': 'Vegetarian',
+      'smoothie': 'Healthy',
+      'juice': 'Healthy',
+      'acai': 'Healthy',
+      'boba': 'Cafe',
+      'tea house': 'Cafe',
+      'coffee': 'Cafe',
+      'donut': 'Bakery',
+      'bagel': 'Bakery',
     };
 
-    const nameLower = name.toLowerCase();
+    const searchText = [name, editorialSummary].filter(Boolean).join(' ').toLowerCase();
     Object.entries(cuisineCategoryMap).forEach(([keyword, category]) => {
-      if (nameLower.includes(keyword)) {
+      if (searchText.includes(keyword)) {
         categories.add(category);
       }
     });
@@ -113,23 +166,92 @@ function extractCategories(types?: string[], name?: string): string {
   return categories.size > 0 ? Array.from(categories).join(', ') : 'Restaurant';
 }
 
-// Extract cuisine types from Google types and name
-function extractCuisineTypes(types?: string[], name?: string): string {
+// Well-known chain name to cuisine mapping
+const CHAIN_CUISINE_MAP: { [key: string]: string } = {
+  "chick-fil-a": "Chicken, American",
+  "whataburger": "Burger, American",
+  "panda express": "Chinese",
+  "chipotle": "Mexican",
+  "olive garden": "Italian",
+  "red lobster": "Seafood",
+  "texas roadhouse": "Steakhouse, American",
+  "ihop": "Breakfast, American",
+  "denny's": "Breakfast, American",
+  "waffle house": "Breakfast, American",
+  "chili's": "American, Tex-Mex",
+  "applebee's": "American",
+  "buffalo wild wings": "Wings, American",
+  "wingstop": "Wings, American",
+  "popeyes": "Cajun, Chicken",
+  "raising cane's": "Chicken, American",
+  "jason's deli": "Deli, American",
+  "panera": "Bakery, American",
+  "jimmy john's": "Deli, Sandwich",
+  "firehouse subs": "Deli, Sandwich",
+  "jersey mike's": "Deli, Sandwich",
+  "subway": "Deli, Sandwich",
+  "sonic": "American, Fast Food",
+  "mcdonald's": "American, Fast Food",
+  "wendy's": "American, Fast Food",
+  "taco bell": "Mexican, Fast Food",
+  "taco cabana": "Mexican, Tex-Mex",
+  "el pollo loco": "Mexican, Chicken",
+  "torchy's": "Mexican, Tacos",
+  "cheddar's": "American, Southern",
+  "cracker barrel": "American, Southern",
+  "saltgrass": "Steakhouse, American",
+  "perry's steakhouse": "Steakhouse, Upscale",
+  "outback": "Steakhouse, American",
+  "longhorn": "Steakhouse, American",
+  "ruth's chris": "Steakhouse, Upscale",
+  "p.f. chang's": "Chinese, Asian",
+  "pei wei": "Asian",
+  "benihana": "Japanese, Hibachi",
+  "red robin": "Burger, American",
+  "five guys": "Burger, American",
+  "shake shack": "Burger, American",
+  "in-n-out": "Burger, American",
+  "culver's": "Burger, American",
+  "la madeleine": "French, Bakery",
+  "nothing bundt": "Bakery, Dessert",
+  "starbucks": "Cafe, Coffee",
+  "dunkin": "Cafe, Breakfast",
+};
+
+// Extract cuisine types from Google types, name, and editorial summary
+function extractCuisineTypes(types?: string[], name?: string, editorialSummary?: string): string {
   const cuisines = new Set<string>();
-  
-  // Common cuisine keywords to look for in the name
+
+  // Check chain name mapping first
+  if (name) {
+    const nameLower = name.toLowerCase();
+    for (const [chain, cuisine] of Object.entries(CHAIN_CUISINE_MAP)) {
+      if (nameLower.includes(chain)) {
+        cuisine.split(', ').forEach(c => cuisines.add(c));
+        break;
+      }
+    }
+  }
+
+  // Common cuisine keywords to look for in name + editorial summary
   const cuisineKeywords = [
     'Mexican', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Thai', 'Vietnamese',
     'Indian', 'Mediterranean', 'Greek', 'French', 'American', 'BBQ', 'Barbecue',
     'Sushi', 'Pizza', 'Burger', 'Seafood', 'Steakhouse', 'Tex-Mex', 'Asian',
     'Cajun', 'Southern', 'German', 'Irish', 'Brazilian', 'Peruvian', 'Cuban',
-    'Spanish', 'Ethiopian', 'Lebanese', 'Turkish', 'Halal', 'Vegan', 'Vegetarian'
+    'Spanish', 'Ethiopian', 'Lebanese', 'Turkish', 'Halal', 'Vegan', 'Vegetarian',
+    'Wings', 'Chicken', 'Pho', 'Ramen', 'Noodle', 'Crawfish', 'Taco', 'Taqueria',
+    'Filipino', 'Hawaiian', 'Poke', 'Soul Food', 'Deli', 'Diner', 'Brunch',
+    'Smoothie', 'Boba', 'Tea', 'Shawarma', 'Falafel', 'Gyro', 'Hookah',
+    'Colombian', 'Venezuelan', 'Salvadoran', 'Honduran', 'Nepali', 'Pakistani',
+    'Hot Pot', 'Dim Sum', 'Wok', 'Donut', 'Bagel', 'Sandwich', 'Acai',
   ];
 
-  // Check name for cuisine keywords
-  if (name) {
+  // Search both name and editorial summary for keywords
+  const searchText = [name, editorialSummary].filter(Boolean).join(' ');
+  if (searchText) {
     cuisineKeywords.forEach(keyword => {
-      if (name.toLowerCase().includes(keyword.toLowerCase())) {
+      if (searchText.toLowerCase().includes(keyword.toLowerCase())) {
         cuisines.add(keyword);
       }
     });
@@ -197,8 +319,8 @@ export function transformGooglePlaceToRestaurant(place: any): any {
     phone: details.formatted_phone_number || details.international_phone_number || null,
     website: details.website || null,
     email: null, // Google doesn't provide email
-    categories: extractCategories(details.types, details.name),
-    cuisineTypes: extractCuisineTypes(details.types, details.name),
+    categories: extractCategories(details.types, details.name, details.editorial_summary?.overview),
+    cuisineTypes: extractCuisineTypes(details.types, details.name, details.editorial_summary?.overview),
     hours: convertOpeningHours(details.opening_hours),
     priceLevel: convertPriceLevel(details.price_level),
     photos: photos.join(','),

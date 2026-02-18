@@ -132,7 +132,11 @@ export async function fetchAllKatyRestaurants(): Promise<any[]> {
       });
       
       console.log(`Found ${restaurants.length} restaurants near ${point.name}`);
-      
+
+      if (restaurants.length >= 60) {
+        console.warn(`⚠️ SATURATION: ${point.name} returned ${restaurants.length} results (Google max). Some restaurants may be missed in this area.`);
+      }
+
       // Wait between searches to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error) {
