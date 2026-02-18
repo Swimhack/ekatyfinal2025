@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
           }
         }
       },
+      orderBy: { rating: 'desc' },
       take: limit + 20, // Get extra for distance filtering
       skip: offset
     })
