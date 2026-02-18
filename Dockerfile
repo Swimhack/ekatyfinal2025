@@ -34,9 +34,9 @@ WORKDIR /app
 RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
 
 # Copy package files and install production dependencies
-# We need prisma, ts-node for database operations
+# We need prisma, tsx for database operations and seeding
 COPY package*.json ./
-RUN npm ci --omit=dev && npm install prisma ts-node --save
+RUN npm ci --omit=dev && npm install prisma tsx --save
 
 # Copy built application from builder stage
 COPY --from=builder /app/.next ./.next
