@@ -5,10 +5,22 @@ import { checkAndIncrementUsage } from './rate-limiter';
 // Rate limiter to respect API limits
 const rateLimiter = pLimit(GOOGLE_CONFIG.rateLimit);
 
-// Fetch all restaurants near a specific point
+// All food-related Google Places types to search
+const FOOD_PLACE_TYPES = [
+  'restaurant',
+  'cafe',
+  'bakery',
+  'bar',
+  'meal_delivery',
+  'meal_takeaway',
+  'food',
+];
+
+// Fetch all food places near a specific point for a given type
 export async function fetchNearbyRestaurants(
   location: { lat: number; lng: number },
-  radius: number = 5000
+  radius: number = 5000,
+  placeType: string = 'restaurant'
 ): Promise<any[]> {
   await checkAndIncrementUsage();
 
@@ -18,7 +30,7 @@ export async function fetchNearbyRestaurants(
         params: {
           location,
           radius,
-          type: 'restaurant',
+          type: placeType,
           key: GOOGLE_CONFIG.apiKey,
         },
         timeout: 10000,
@@ -26,11 +38,11 @@ export async function fetchNearbyRestaurants(
     );
 
     const places = response.data.results || [];
-    
+
     // Handle pagination if there are more results
     let allPlaces = [...places];
     let nextPageToken = response.data.next_page_token;
-    
+
     while (nextPageToken) {
       // Wait 2 seconds before requesting next page (Google requirement)
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -47,14 +59,14 @@ export async function fetchNearbyRestaurants(
           timeout: 10000,
         })
       );
-      
+
       allPlaces = [...allPlaces, ...(nextResponse.data.results || [])];
       nextPageToken = nextResponse.data.next_page_token;
     }
-    
+
     return allPlaces;
   } catch (error) {
-    console.error('Error fetching nearby restaurants:', error);
+    console.error(`Error fetching nearby ${placeType}:`, error);
     throw error;
   }
 }
@@ -111,42 +123,55 @@ export function getPhotoUrl(
     `photoreference=${photoReference}&key=${GOOGLE_CONFIG.apiKey}`;
 }
 
-// Fetch all restaurants in the Katy area
+// Fetch all food establishments in the Katy area (all types × all zones)
 export async function fetchAllKatyRestaurants(): Promise<any[]> {
-  const allRestaurants = new Map(); // Use Map to avoid duplicates
-  
-  console.log('Starting to fetch restaurants from Katy area...');
-  
-  for (const point of KATY_SEARCH_CONFIG.searchPoints) {
-    console.log(`Fetching restaurants near ${point.name}...`);
-    
-    try {
-      const restaurants = await fetchNearbyRestaurants(
-        { lat: point.lat, lng: point.lng },
-        5000 // 5km radius for each point
-      );
-      
-      // Add to map using place_id as key to avoid duplicates
-      restaurants.forEach(restaurant => {
-        allRestaurants.set(restaurant.place_id, restaurant);
-      });
-      
-      console.log(`Found ${restaurants.length} restaurants near ${point.name}`);
+  const allRestaurants = new Map(); // Use Map to deduplicate by place_id
 
-      if (restaurants.length >= 60) {
-        console.warn(`⚠️ SATURATION: ${point.name} returned ${restaurants.length} results (Google max). Some restaurants may be missed in this area.`);
+  const totalSearches = KATY_SEARCH_CONFIG.searchPoints.length * FOOD_PLACE_TYPES.length;
+  let searchCount = 0;
+
+  console.log(`Starting comprehensive food establishment search...`);
+  console.log(`${KATY_SEARCH_CONFIG.searchPoints.length} zones × ${FOOD_PLACE_TYPES.length} types = ${totalSearches} searches`);
+
+  for (const placeType of FOOD_PLACE_TYPES) {
+    const beforeCount = allRestaurants.size;
+    console.log(`\n--- Searching type: ${placeType} ---`);
+
+    for (const point of KATY_SEARCH_CONFIG.searchPoints) {
+      searchCount++;
+
+      try {
+        const restaurants = await fetchNearbyRestaurants(
+          { lat: point.lat, lng: point.lng },
+          5000, // 5km radius per point
+          placeType
+        );
+
+        // Add to map using place_id as key to avoid duplicates
+        restaurants.forEach(restaurant => {
+          allRestaurants.set(restaurant.place_id, restaurant);
+        });
+
+        console.log(`[${searchCount}/${totalSearches}] ${placeType} @ ${point.name}: ${restaurants.length} results (total unique: ${allRestaurants.size})`);
+
+        if (restaurants.length >= 60) {
+          console.warn(`⚠️ SATURATION: ${placeType} @ ${point.name} hit 60-result cap. Some may be missed.`);
+        }
+
+        // Wait between searches to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`Error fetching ${placeType} near ${point.name}:`, error);
       }
-
-      // Wait between searches to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (error) {
-      console.error(`Error fetching restaurants near ${point.name}:`, error);
     }
+
+    const newFromType = allRestaurants.size - beforeCount;
+    console.log(`Type "${placeType}" added ${newFromType} new unique places`);
   }
-  
+
   const uniqueRestaurants = Array.from(allRestaurants.values());
-  console.log(`Total unique restaurants found: ${uniqueRestaurants.length}`);
-  
+  console.log(`\nTotal unique food establishments found: ${uniqueRestaurants.length}`);
+
   return uniqueRestaurants;
 }
 
