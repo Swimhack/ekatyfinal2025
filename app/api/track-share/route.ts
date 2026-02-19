@@ -5,32 +5,32 @@ export async function POST(request: NextRequest) {
   try {
     const { restaurantId, shareType, vibe } = await request.json()
 
-    // Track the share in database
-    // For now, we'll use a simple counter approach
-    // In production, you'd want to track user sessions, IP addresses, etc.
-
-    // You can expand this to:
-    // 1. Create a shares table to track all shares
-    // 2. Award points/badges to users
-    // 3. Track referral clicks
-    // 4. Create leaderboards
-
-    console.log('Share tracked:', {
-      restaurantId,
-      shareType,
-      vibe,
-      timestamp: new Date().toISOString()
-    })
-
-    // Update restaurant share count (if you add a shareCount field to Restaurant model)
-    // await prisma.restaurant.update({
-    //   where: { id: restaurantId },
-    //   data: { shareCount: { increment: 1 } }
-    // })
+    // Persist share click to RestaurantAnalytics
+    if (restaurantId) {
+      const today = new Date().toISOString().slice(0, 10)
+      await prisma.restaurantAnalytics.upsert({
+        where: {
+          restaurantId_date: {
+            restaurantId: String(restaurantId),
+            date: today,
+          },
+        },
+        update: {
+          shareClicks: { increment: 1 },
+        },
+        create: {
+          restaurantId: String(restaurantId),
+          date: today,
+          shareClicks: 1,
+        },
+      }).catch(err => {
+        console.error('Analytics upsert failed:', err)
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Share tracking error:', error)
-    return NextResponse.json({ success: false }, { status: 500 })
+    return NextResponse.json({ success: true })
   }
 }

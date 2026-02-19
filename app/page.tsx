@@ -8,6 +8,8 @@ import BlogPreview from '@/components/BlogPreview'
 import LaunchPromotionSection from '@/components/LaunchPromotionSection'
 import Script from 'next/script'
 import { useLanguage } from '@/contexts/LanguageContext'
+import { useGamification } from '@/contexts/GamificationContext'
+import TierIcon from '@/components/TierIcon'
 
 const categories = [
   { name: 'Mexican', emoji: '🌮' },
@@ -22,6 +24,7 @@ const categories = [
 
 export default function HomePage() {
   const { t } = useLanguage()
+  const { shareCount, currentTier } = useGamification()
   const [featuredRestaurants, setFeaturedRestaurants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -141,6 +144,18 @@ export default function HomePage() {
           </svg>
         </div>
       </section>
+
+      {/* Community Ambassador Counter */}
+      {shareCount > 0 && (
+        <div className="bg-white border-b border-secondary-100 py-3">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center gap-2 text-sm text-secondary-500">
+            <TierIcon tier={currentTier} className="w-4 h-4" />
+            <span>{shareCount} restaurant{shareCount !== 1 ? 's' : ''} shared</span>
+            <span className="text-secondary-300">·</span>
+            <span>Join the Katy dining community</span>
+          </div>
+        </div>
+      )}
 
       {/* Launch Promotion Section */}
       <LaunchPromotionSection />

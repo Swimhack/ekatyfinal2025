@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { toPng } from 'html-to-image'
 import QRCode from 'qrcode'
+import { useGamification } from '@/contexts/GamificationContext'
+import TierIcon from '@/components/TierIcon'
 
 interface ShareDiscoveryCardProps {
   restaurant: {
@@ -21,6 +23,7 @@ export default function ShareDiscoveryCard({ restaurant }: ShareDiscoveryCardPro
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null)
   const [caption, setCaption] = useState('')
   const [qrCodeUrl, setQrCodeUrl] = useState('')
+  const { hasBadge, isVip, currentTier, ambassadorName } = useGamification()
 
   const vibes = [
     { emoji: '🔥', label: 'Fire', color: 'from-red-500 to-orange-500' },
@@ -69,6 +72,19 @@ export default function ShareDiscoveryCard({ restaurant }: ShareDiscoveryCardPro
     }
   }
 
+  const trackShare = async (shareType: string) => {
+    window.dispatchEvent(new CustomEvent('ekaty:share'))
+    await fetch('/api/track-share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restaurantId: restaurant.id,
+        shareType,
+        vibe: selectedVibe,
+      }),
+    }).catch(() => {})
+  }
+
   const downloadCard = async () => {
     const cardElement = document.getElementById('discovery-card')
     if (!cardElement) return
@@ -86,17 +102,7 @@ export default function ShareDiscoveryCard({ restaurant }: ShareDiscoveryCardPro
       link.href = dataUrl
       link.click()
 
-      // Track the share
-      window.dispatchEvent(new CustomEvent('ekaty:share'))
-      await fetch('/api/track-share', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurantId: restaurant.id,
-          shareType: 'discovery_card',
-          vibe: selectedVibe,
-        }),
-      })
+      await trackShare('discovery_card')
     } catch (error) {
       console.error('Failed to generate card:', error)
     }
@@ -109,27 +115,17 @@ export default function ShareDiscoveryCard({ restaurant }: ShareDiscoveryCardPro
     const shareUrls = {
       twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-      instagram: '', // Instagram requires image upload, so we download the card
+      instagram: '',
     }
 
     if (platform === 'instagram') {
       await downloadCard()
-      alert('Card downloaded! Share it on Instagram Stories or Feed 📸')
+      return // downloadCard already tracks the share
     } else {
       window.open(shareUrls[platform], '_blank', 'width=600,height=400')
     }
 
-    // Track the share
-    window.dispatchEvent(new CustomEvent('ekaty:share'))
-    await fetch('/api/track-share', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        restaurantId: restaurant.id,
-        shareType: platform,
-        vibe: selectedVibe,
-      }),
-    })
+    await trackShare(platform)
   }
 
   return (
@@ -212,10 +208,20 @@ export default function ShareDiscoveryCard({ restaurant }: ShareDiscoveryCardPro
                 </div>
 
                 {/* Content Overlay */}
-                <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
+                <div className={`absolute inset-0 flex flex-col justify-between p-8 text-white ${isVip ? 'ring-2 ring-inset ring-yellow-400/60' : ''}`}>
                   {/* Top: Logo & Vibe */}
                   <div className="flex justify-between items-start">
-                    <img src="/logo.png" alt="eKaty" className="h-12 w-auto drop-shadow-lg" />
+                    <div className="flex items-center gap-2">
+                      <img src="/logo.png" alt="eKaty" className="h-12 w-auto drop-shadow-lg" />
+                      {hasBadge && (
+                        <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-sm rounded-full px-2.5 py-1">
+                          <TierIcon tier={currentTier} className="w-4 h-4" />
+                          {ambassadorName && (
+                            <span className="text-xs font-medium">{ambassadorName}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <div className="text-6xl drop-shadow-lg">
                       {vibes.find(v => v.label === selectedVibe)?.emoji}
                     </div>
@@ -310,23 +316,22 @@ export default function ShareDiscoveryCard({ restaurant }: ShareDiscoveryCardPro
           </div>
 
           {/* Sharing Stats & Rewards */}
-          <div className="bg-gradient-to-r from-primary-50 to-purple-50 rounded-xl p-6 border border-primary-100">
-            <h4 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
-              <span>🎁</span>
-              <span>Share & Earn Rewards!</span>
+          <div className="bg-secondary-50 rounded-xl p-6 border border-secondary-200">
+            <h4 className="font-semibold text-secondary-900 mb-3 text-sm">
+              Community Ambassador Rewards
             </h4>
-            <ul className="space-y-2 text-sm text-gray-700">
+            <ul className="space-y-2 text-sm text-secondary-600">
               <li className="flex items-center space-x-2">
-                <span className="text-green-500">✓</span>
-                <span>Share 3 restaurants → Unlock &ldquo;Foodie Explorer&rdquo; badge</span>
+                <svg className="w-4 h-4 text-primary-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                <span>5 shares — Ambassador badge on your share cards</span>
               </li>
               <li className="flex items-center space-x-2">
-                <span className="text-green-500">✓</span>
-                <span>Get 5 clicks from your shares → Featured on homepage</span>
+                <svg className="w-4 h-4 text-primary-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                <span>10 shares — Early access to new features</span>
               </li>
               <li className="flex items-center space-x-2">
-                <span className="text-green-500">✓</span>
-                <span>Share 10 restaurants → Early access to new features</span>
+                <svg className="w-4 h-4 text-primary-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                <span>25 shares — VIP gold treatment on share cards</span>
               </li>
             </ul>
           </div>

@@ -2,6 +2,7 @@
 
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { GamificationProvider } from '@/contexts/GamificationContext'
 import { AuthProvider } from '@/lib/auth-context'
 import { ReactNode } from 'react'
 
@@ -10,7 +11,9 @@ export default function ClientProviders({ children }: { children: ReactNode }) {
     <ToastProvider>
       <AuthProvider>
         <LanguageProvider>
-          {children}
+          <GamificationProvider>
+            {children}
+          </GamificationProvider>
         </LanguageProvider>
       </AuthProvider>
     </ToastProvider>

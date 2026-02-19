@@ -1,249 +1,280 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useGamification } from '@/contexts/GamificationContext'
+import TierIcon from '@/components/TierIcon'
+import AchievementUnlockNotification from '@/components/AchievementUnlockNotification'
 
-interface Achievement {
-  id: string
-  icon: string
-  title: string
-  description: string
-  requirement: number
-  unlocked: boolean
-  progress: number
+function RewardAction({ reward, onActivate }: {
+  reward: { id: string; actionLabel: string }
+  onActivate: (id: string, payload?: string) => void
+}) {
+  const [titleInput, setTitleInput] = useState('')
+
+  if (reward.id === 'early-access') {
+    return <span className="text-xs text-primary-600 font-medium">Auto-activated</span>
+  }
+
+  if (reward.id === 'custom-title') {
+    return (
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={titleInput}
+          onChange={e => setTitleInput(e.target.value)}
+          placeholder="Your title..."
+          maxLength={30}
+          className="flex-1 text-xs border border-secondary-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+        <button
+          onClick={() => titleInput.trim() && onActivate(reward.id, titleInput.trim())}
+          disabled={!titleInput.trim()}
+          className="text-xs bg-primary-600 text-white px-3 py-1 rounded font-medium hover:bg-primary-700 transition-colors disabled:opacity-40"
+        >
+          Save
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => onActivate(reward.id)}
+      className="text-xs bg-secondary-900 text-white px-3 py-1.5 rounded font-medium hover:bg-secondary-800 transition-colors"
+    >
+      {reward.actionLabel}
+    </button>
+  )
 }
 
 export default function ShareRewardsTracker() {
-  const [shareCount, setShareCount] = useState(0)
+  const {
+    shareCount,
+    achievements,
+    rewards,
+    currentTier,
+    nextTierName,
+    nextTierRequirement,
+    ambassadorName,
+    activateReward,
+  } = useGamification()
+
   const [showTracker, setShowTracker] = useState(false)
-
-  const achievements: Achievement[] = [
-    {
-      id: 'first-share',
-      icon: '🎯',
-      title: 'First Discovery',
-      description: 'Share your first restaurant',
-      requirement: 1,
-      unlocked: shareCount >= 1,
-      progress: Math.min(shareCount, 1),
-    },
-    {
-      id: 'foodie-explorer',
-      icon: '🗺️',
-      title: 'Foodie Explorer',
-      description: 'Share 3 different restaurants',
-      requirement: 3,
-      unlocked: shareCount >= 3,
-      progress: Math.min(shareCount, 3),
-    },
-    {
-      id: 'taste-maker',
-      icon: '👑',
-      title: 'Taste Maker',
-      description: 'Share 10 restaurants',
-      requirement: 10,
-      unlocked: shareCount >= 10,
-      progress: Math.min(shareCount, 10),
-    },
-    {
-      id: 'influencer',
-      icon: '🌟',
-      title: 'Food Influencer',
-      description: 'Share 25 restaurants',
-      requirement: 25,
-      unlocked: shareCount >= 25,
-      progress: Math.min(shareCount, 25),
-    },
-    {
-      id: 'legend',
-      icon: '💎',
-      title: 'Katy Food Legend',
-      description: 'Share 50 restaurants',
-      requirement: 50,
-      unlocked: shareCount >= 50,
-      progress: Math.min(shareCount, 50),
-    },
-  ]
-
-  const rewards = [
-    {
-      id: 'featured',
-      icon: '⭐',
-      title: 'Featured Profile',
-      description: 'Get featured on our homepage',
-      requiredShares: 5,
-      unlocked: shareCount >= 5,
-    },
-    {
-      id: 'early-access',
-      icon: '🚀',
-      title: 'Early Access',
-      description: 'Beta test new features first',
-      requiredShares: 10,
-      unlocked: shareCount >= 10,
-    },
-    {
-      id: 'custom-badge',
-      icon: '🎨',
-      title: 'Custom Badge',
-      description: 'Create your own profile badge',
-      requiredShares: 15,
-      unlocked: shareCount >= 15,
-    },
-    {
-      id: 'vip',
-      icon: '👑',
-      title: 'VIP Status',
-      description: 'Exclusive access to restaurant deals',
-      requiredShares: 25,
-      unlocked: shareCount >= 25,
-    },
-  ]
-
-  useEffect(() => {
-    // Load share count from localStorage
-    const stored = localStorage.getItem('ekaty_share_count')
-    if (stored) {
-      setShareCount(parseInt(stored, 10))
-    }
-
-    // Listen for share events
-    const handleShare = () => {
-      setShareCount(prev => {
-        const newCount = prev + 1
-        localStorage.setItem('ekaty_share_count', newCount.toString())
-        return newCount
-      })
-    }
-
-    window.addEventListener('ekaty:share', handleShare)
-    return () => window.removeEventListener('ekaty:share', handleShare)
-  }, [])
 
   const unlockedAchievements = achievements.filter(a => a.unlocked).length
   const totalAchievements = achievements.length
+  const unlockedRewards = rewards.filter(r => r.unlocked).length
+  const totalRewards = rewards.length
+  const unlockedTotal = unlockedAchievements + unlockedRewards
+
+  const handleShareAchievement = (achievement: { title: string; description: string; tier: string }) => {
+    const text = `I just earned "${achievement.title}" on eKaty — Katy's premier restaurant guide. ${achievement.description}.`
+    const url = 'https://ekaty.com'
+
+    if (navigator.share) {
+      navigator.share({ title: `eKaty Achievement: ${achievement.title}`, text, url }).catch(() => {})
+    } else {
+      window.open(
+        `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+        '_blank',
+        'width=600,height=400'
+      )
+    }
+    window.dispatchEvent(new CustomEvent('ekaty:share'))
+  }
+
+  // Progress percentage for the milestone timeline
+  const maxRequirement = achievements[achievements.length - 1]?.requirement || 50
+  const progressPct = Math.min((shareCount / maxRequirement) * 100, 100)
 
   return (
     <>
-      {/* Floating Button */}
+      <AchievementUnlockNotification />
+
+      {/* FAB */}
       <button
         onClick={() => setShowTracker(true)}
-        className="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full p-4 shadow-2xl hover:scale-110 transition-transform z-40"
+        className="fixed bottom-6 right-6 z-40 group"
+        aria-label={`Ambassador profile — ${unlockedTotal} unlocked`}
       >
-        <div className="relative">
-          <span className="text-2xl">🎁</span>
-          {unlockedAchievements > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-              {unlockedAchievements}
+        <div className="relative bg-secondary-900 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg border border-secondary-700 hover:bg-secondary-800 transition-all duration-300">
+          <svg className="w-6 h-6 text-primary-400 group-hover:text-primary-300 transition-colors" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.504-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0016.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.023 6.023 0 01-2.77.672c-.996 0-1.933-.223-2.77-.672" />
+          </svg>
+          {unlockedTotal > 0 && (
+            <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center ring-2 ring-white">
+              {unlockedTotal}
             </span>
           )}
         </div>
       </button>
 
-      {/* Rewards Tracker Modal */}
+      {/* Modal */}
       {showTracker && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto"
+          className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 overflow-y-auto"
           onClick={() => setShowTracker(false)}
         >
           <div
-            className="bg-white rounded-2xl max-w-2xl w-full p-8 relative my-8"
-            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl max-w-lg w-full p-6 relative my-8 shadow-2xl"
+            onClick={e => e.stopPropagation()}
           >
+            {/* Close */}
             <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setShowTracker(false)
-              }}
-              className="absolute -top-3 -right-3 bg-gray-800 hover:bg-gray-900 text-white transition-all p-2.5 rounded-full shadow-xl border-2 border-white z-50 cursor-pointer group"
-              aria-label="Close rewards modal"
+              onClick={() => setShowTracker(false)}
+              className="absolute top-4 right-4 text-secondary-400 hover:text-secondary-600 transition-colors"
+              aria-label="Close"
               type="button"
             >
-              <svg className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
             {/* Header */}
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                🎁 Your Rewards
+            <div className="border-b border-secondary-200 pb-5 mb-5">
+              <h2 className="text-xl font-bold text-secondary-900 tracking-tight">
+                Ambassador Profile
               </h2>
-              <p className="text-gray-600">
-                Share restaurants to unlock awesome rewards!
+              <p className="text-secondary-500 text-sm mt-0.5">
+                Your contribution to the Katy dining community
               </p>
+
+              {/* Tier display */}
+              <div className="mt-4 flex items-center gap-3">
+                <TierIcon tier={currentTier} className="w-10 h-10" />
+                <div>
+                  <div className="font-semibold text-secondary-900 capitalize">{currentTier}</div>
+                  {ambassadorName && (
+                    <div className="text-sm text-secondary-500">{ambassadorName}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4 mt-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-secondary-900">{shareCount}</div>
+                  <div className="text-[10px] text-secondary-500 uppercase tracking-wider font-medium">Shares</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-secondary-900">{unlockedAchievements}/{totalAchievements}</div>
+                  <div className="text-[10px] text-secondary-500 uppercase tracking-wider font-medium">Milestones</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-secondary-900">{unlockedRewards}/{totalRewards}</div>
+                  <div className="text-[10px] text-secondary-500 uppercase tracking-wider font-medium">Rewards</div>
+                </div>
+              </div>
+
+              {/* Progress to next tier */}
+              {nextTierRequirement && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-[11px] text-secondary-500 mb-1">
+                    <span>Progress to <span className="capitalize">{nextTierName}</span></span>
+                    <span>{shareCount}/{nextTierRequirement}</span>
+                  </div>
+                  <div className="w-full bg-secondary-100 rounded-full h-1.5">
+                    <div
+                      className="bg-primary-500 h-1.5 rounded-full transition-all duration-500"
+                      style={{ width: `${(shareCount / nextTierRequirement) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-blue-600">{shareCount}</div>
-                <div className="text-sm text-blue-700 font-medium">Shares</div>
-              </div>
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-purple-600">
-                  {unlockedAchievements}/{totalAchievements}
-                </div>
-                <div className="text-sm text-purple-700 font-medium">Achievements</div>
-              </div>
-              <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-pink-600">
-                  {rewards.filter(r => r.unlocked).length}/{rewards.length}
-                </div>
-                <div className="text-sm text-pink-700 font-medium">Rewards</div>
-              </div>
-            </div>
-
-            {/* Achievements */}
-            <div className="mb-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">
-                🏆 Achievements
+            {/* Achievements - Milestones */}
+            <div className="mb-6">
+              <h3 className="text-xs font-semibold text-secondary-500 uppercase tracking-wider mb-4">
+                Milestones
               </h3>
-              <div className="space-y-3">
-                {achievements.map((achievement) => (
+
+              {/* Desktop: horizontal timeline */}
+              <div className="hidden md:block">
+                <div className="flex items-start justify-between relative">
+                  {/* Connection line */}
+                  <div className="absolute top-[18px] left-[20px] right-[20px] h-px bg-secondary-200" />
                   <div
-                    key={achievement.id}
-                    className={`
-                      p-4 rounded-xl border-2 transition-all
-                      ${achievement.unlocked
-                        ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
-                        : 'bg-gray-50 border-gray-200'
-                      }
-                    `}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className={`text-3xl ${achievement.unlocked ? 'scale-110' : 'grayscale opacity-50'}`}>
-                          {achievement.icon}
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-gray-900">
-                            {achievement.title}
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            {achievement.description}
-                          </p>
-                        </div>
+                    className="absolute top-[18px] left-[20px] h-px bg-primary-500 transition-all duration-500"
+                    style={{ width: `calc(${progressPct}% - 40px)` }}
+                  />
+
+                  {achievements.map(achievement => (
+                    <div key={achievement.id} className="relative flex flex-col items-center z-10 w-[72px]">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all ${
+                        achievement.unlocked
+                          ? 'bg-primary-600 border-primary-600 text-white'
+                          : 'bg-white border-secondary-300 text-secondary-400'
+                      }`}>
+                        {achievement.unlocked ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                          </svg>
+                        )}
                       </div>
-                      {achievement.unlocked ? (
-                        <div className="text-green-600 font-semibold">
-                          ✓ Unlocked
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-500">
-                          {achievement.progress}/{achievement.requirement}
-                        </div>
+                      <span className={`mt-1.5 text-[10px] text-center leading-tight ${
+                        achievement.unlocked ? 'text-secondary-900 font-medium' : 'text-secondary-400'
+                      }`}>
+                        {achievement.title}
+                      </span>
+                      <span className="text-[9px] text-secondary-400">{achievement.requirement} shares</span>
+                      {achievement.unlocked && (
+                        <button
+                          onClick={() => handleShareAchievement(achievement)}
+                          className="mt-0.5 text-[9px] text-primary-600 hover:text-primary-700 font-medium transition-colors"
+                        >
+                          Share
+                        </button>
                       )}
                     </div>
-                    {!achievement.unlocked && (
-                      <div className="mt-2">
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-primary-500 to-purple-500 h-2 rounded-full transition-all"
-                            style={{ width: `${(achievement.progress / achievement.requirement) * 100}%` }}
-                          />
-                        </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mobile: vertical list */}
+              <div className="md:hidden space-y-2">
+                {achievements.map(achievement => (
+                  <div
+                    key={achievement.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border ${
+                      achievement.unlocked ? 'border-primary-200 bg-white' : 'border-secondary-100 bg-secondary-50'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      achievement.unlocked ? 'bg-primary-600 text-white' : 'bg-secondary-200 text-secondary-400'
+                    }`}>
+                      {achievement.unlocked ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-medium ${achievement.unlocked ? 'text-secondary-900' : 'text-secondary-400'}`}>
+                        {achievement.title}
                       </div>
+                      <div className="text-xs text-secondary-500">{achievement.description}</div>
+                    </div>
+                    {achievement.unlocked ? (
+                      <button
+                        onClick={() => handleShareAchievement(achievement)}
+                        className="text-xs text-primary-600 font-medium flex-shrink-0 hover:text-primary-700 transition-colors"
+                      >
+                        Share
+                      </button>
+                    ) : (
+                      <span className="text-xs text-secondary-400 flex-shrink-0">
+                        {achievement.progress}/{achievement.requirement}
+                      </span>
                     )}
                   </div>
                 ))}
@@ -252,51 +283,57 @@ export default function ShareRewardsTracker() {
 
             {/* Rewards */}
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">
-                🎁 Unlockable Rewards
+              <h3 className="text-xs font-semibold text-secondary-500 uppercase tracking-wider mb-4">
+                Rewards
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {rewards.map((reward) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {rewards.map(reward => (
                   <div
                     key={reward.id}
-                    className={`
-                      p-4 rounded-xl border-2 text-center transition-all
-                      ${reward.unlocked
-                        ? 'bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200'
-                        : 'bg-gray-50 border-gray-200'
-                      }
-                    `}
+                    className={`p-4 rounded-lg border transition-all ${
+                      reward.unlocked ? 'border-primary-200 bg-white' : 'border-secondary-100 bg-secondary-50'
+                    }`}
                   >
-                    <div className={`text-4xl mb-2 ${reward.unlocked ? '' : 'grayscale opacity-50'}`}>
-                      {reward.icon}
+                    <div className="flex items-start justify-between mb-1.5">
+                      <h4 className={`font-medium text-sm ${reward.unlocked ? 'text-secondary-900' : 'text-secondary-400'}`}>
+                        {reward.title}
+                      </h4>
+                      {reward.unlocked && reward.activated && (
+                        <span className="text-[10px] font-medium text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
+                          Active
+                        </span>
+                      )}
                     </div>
-                    <h4 className="font-semibold text-gray-900 mb-1">
-                      {reward.title}
-                    </h4>
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className={`text-xs mb-3 ${reward.unlocked ? 'text-secondary-600' : 'text-secondary-400'}`}>
                       {reward.description}
                     </p>
+
                     {reward.unlocked ? (
-                      <span className="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                        Unlocked!
-                      </span>
+                      reward.activated ? (
+                        <div className="text-xs text-secondary-500">
+                          {reward.id === 'custom-title' && ambassadorName
+                            ? `Title: "${ambassadorName}"`
+                            : 'Activated'}
+                        </div>
+                      ) : (
+                        <RewardAction reward={reward} onActivate={activateReward} />
+                      )
                     ) : (
-                      <span className="inline-block bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-xs font-medium">
-                        {reward.requiredShares} shares needed
-                      </span>
+                      <div className="text-xs text-secondary-400">
+                        {reward.requiredShares - shareCount > 0
+                          ? `${reward.requiredShares - shareCount} more shares to unlock`
+                          : 'Ready to unlock'}
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* CTA */}
-            <div className="mt-8 bg-gradient-to-r from-primary-600 to-purple-600 rounded-xl p-6 text-white text-center">
-              <h4 className="text-xl font-bold mb-2">
-                Keep Sharing to Unlock More! 🚀
-              </h4>
-              <p className="text-sm opacity-90">
-                Every restaurant you share helps others discover amazing food in Katy!
+            {/* Footer */}
+            <div className="mt-6 pt-4 border-t border-secondary-200 text-center">
+              <p className="text-xs text-secondary-500">
+                Every share helps the Katy dining community grow.
               </p>
             </div>
           </div>

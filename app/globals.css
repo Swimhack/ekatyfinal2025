@@ -25,6 +25,22 @@
   animation: slide-up 0.3s ease-out;
 }
 
+/* Achievement unlock notification */
+@keyframes achievement-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-achievement-slide-in {
+  animation: achievement-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Blog Article Content Styling */
 .blog-article-content {
   max-width: 760px;
