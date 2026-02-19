@@ -10,10 +10,11 @@ const prisma = new PrismaClient()
 function verifyAdminAuth(request: Request): boolean {
   const authHeader = request.headers.get('authorization')
   const apiKey = process.env.ADMIN_API_KEY || 'your-secret-admin-key'
-  
+
   return authHeader === `Bearer ${apiKey}`
 }
 
+// Streaming sync — keeps HTTP connection alive so Fly.io won't autostop
 export async function POST(request: Request) {
   // Verify admin authentication
   if (!verifyAdminAuth(request)) {
@@ -31,144 +32,112 @@ export async function POST(request: Request) {
     )
   }
 
-  try {
-    console.log('🔄 Starting daily restaurant sync...')
-    
-    // Step 1: Discover all restaurants
-    console.log('📍 Discovering restaurants in Katy, TX area...')
-    const restaurants = await fetchAllKatyRestaurants()
-    
-    if (restaurants.length === 0) {
-      return NextResponse.json(
-        { error: 'No restaurants found' },
-        { status: 500 }
-      )
-    }
+  const encoder = new TextEncoder()
 
-    console.log(`✅ Found ${restaurants.length} unique restaurants`)
-
-    // Step 2: Fetch detailed data
-    console.log('📋 Fetching detailed information...')
-    const detailedRestaurants = await fetchDetailedRestaurantData(
-      restaurants,
-      (current, total) => {
-        console.log(`Progress: ${current}/${total} (${Math.round(current/total * 100)}%)`)
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (msg: string) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ message: msg, timestamp: new Date().toISOString() })}\n\n`))
       }
-    )
-    
-    console.log(`✅ Fetched details for ${detailedRestaurants.length} restaurants`)
 
-    // Step 3: Import to database (update existing records)
-    console.log('💾 Updating database...')
-    const importResults = await importRestaurants(detailedRestaurants, {
-      updateExisting: true,
-      onProgress: (current, total, restaurant) => {
-        console.log(`Importing: ${current}/${total} - ${restaurant?.name || 'Processing...'}`)
-      }
-    })
-    
-    // Step 4: Clean up duplicates
-    console.log('🧹 Cleaning up duplicates...')
-    const duplicatesRemoved = await deduplicateRestaurants()
+      const syncPrisma = new PrismaClient()
 
-    // Check failure threshold (fail if >10% failed)
-    const totalProcessed = detailedRestaurants.length
-    const failureRate = totalProcessed > 0 ? importResults.failed / totalProcessed : 0
-    const isHighFailureRate = failureRate > 0.1
+      try {
+        send('Starting comprehensive restaurant sync...')
 
-    if (isHighFailureRate) {
-      console.error(`⚠️  High failure rate detected: ${importResults.failed}/${totalProcessed} (${(failureRate * 100).toFixed(1)}%)`)
+        // Step 1: Discover all restaurants
+        send('Discovering restaurants in Katy, TX area (7 types x 23 zones = 161 searches)...')
+        const restaurants = await fetchAllKatyRestaurants()
 
-      // Log the failed sync
-      await prisma.auditLog.create({
-        data: {
-          action: 'RESTAURANT_SYNC_FAILED',
-          entity: 'Restaurant',
-          entityId: 'system',
-          changes: JSON.stringify({
-            created: importResults.created,
-            updated: importResults.updated,
-            failed: importResults.failed,
-            failureRate: `${(failureRate * 100).toFixed(1)}%`,
-            duplicatesRemoved,
-            reason: 'High failure rate (>10%)'
-          }),
-          userId: null
+        if (restaurants.length === 0) {
+          send('ERROR: No restaurants found')
+          controller.close()
+          return
         }
-      })
 
-      return NextResponse.json({
-        success: false,
-        error: `High failure rate: ${importResults.failed}/${totalProcessed} restaurants failed (${(failureRate * 100).toFixed(1)}%)`,
-        stats: {
-          discovered: restaurants.length,
-          created: importResults.created,
-          updated: importResults.updated,
-          failed: importResults.failed,
-          duplicatesRemoved
-        }
-      }, { status: 500 })
+        send(`Found ${restaurants.length} unique restaurants`)
+
+        // Step 2: Fetch detailed data
+        send('Fetching detailed information...')
+        const detailedRestaurants = await fetchDetailedRestaurantData(
+          restaurants,
+          (current, total) => {
+            if (current % 25 === 0 || current === total) {
+              send(`Detail progress: ${current}/${total} (${Math.round(current/total * 100)}%)`)
+            }
+          }
+        )
+
+        send(`Fetched details for ${detailedRestaurants.length} restaurants`)
+
+        // Step 3: Import to database
+        send('Importing to database...')
+        const importResults = await importRestaurants(detailedRestaurants, {
+          updateExisting: true,
+          onProgress: (current, total, restaurant) => {
+            if (current % 50 === 0 || current === total) {
+              send(`Importing: ${current}/${total} - ${restaurant?.name || 'Processing...'}`)
+            }
+          }
+        })
+
+        // Step 4: Clean up duplicates
+        send('Cleaning up duplicates...')
+        const duplicatesRemoved = await deduplicateRestaurants()
+
+        const totalProcessed = detailedRestaurants.length
+        const failureRate = totalProcessed > 0 ? importResults.failed / totalProcessed : 0
+        const action = failureRate > 0.1 ? 'RESTAURANT_SYNC_FAILED' : 'RESTAURANT_SYNC'
+
+        await syncPrisma.auditLog.create({
+          data: {
+            action,
+            entity: 'Restaurant',
+            entityId: 'system',
+            changes: JSON.stringify({
+              discovered: restaurants.length,
+              created: importResults.created,
+              updated: importResults.updated,
+              failed: importResults.failed,
+              failureRate: `${(failureRate * 100).toFixed(1)}%`,
+              duplicatesRemoved
+            }),
+            userId: null
+          }
+        })
+
+        const activeCount = await syncPrisma.restaurant.count({ where: { active: true } })
+
+        send(`COMPLETE: ${importResults.created} created, ${importResults.updated} updated, ${importResults.failed} failed, ${duplicatesRemoved} dupes removed. Total active: ${activeCount}`)
+
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Unknown error'
+        send(`ERROR: ${errMsg}`)
+        console.error('Sync failed:', error)
+
+        await syncPrisma.auditLog.create({
+          data: {
+            action: 'RESTAURANT_SYNC_FAILED',
+            entity: 'Restaurant',
+            entityId: 'system',
+            changes: JSON.stringify({ error: errMsg }),
+            userId: null
+          }
+        }).catch(e => console.error('Failed to log sync error:', e))
+      } finally {
+        await syncPrisma.$disconnect()
+        controller.close()
+      }
     }
+  })
 
-    // Log the sync event
-    await prisma.auditLog.create({
-      data: {
-        action: 'RESTAURANT_SYNC',
-        entity: 'Restaurant',
-        entityId: 'system',
-        changes: JSON.stringify({
-          created: importResults.created,
-          updated: importResults.updated,
-          failed: importResults.failed,
-          duplicatesRemoved
-        }),
-        userId: null // System action
-      }
-    })
-
-    const result = {
-      success: true,
-      timestamp: new Date().toISOString(),
-      stats: {
-        discovered: restaurants.length,
-        created: importResults.created,
-        updated: importResults.updated,
-        failed: importResults.failed,
-        duplicatesRemoved
-      }
-    }
-
-    console.log('✅ Daily sync completed successfully')
-    console.log(JSON.stringify(result, null, 2))
-
-    return NextResponse.json(result)
-    
-  } catch (error) {
-    console.error('❌ Sync failed:', error)
-    
-    // Log the error
-    await prisma.auditLog.create({
-      data: {
-        action: 'RESTAURANT_SYNC_FAILED',
-        entity: 'Restaurant',
-        entityId: 'system',
-        changes: JSON.stringify({
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }),
-        userId: null
-      }
-    })
-    
-    return NextResponse.json(
-      { 
-        error: 'Sync failed', 
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
-  } finally {
-    await prisma.$disconnect()
-  }
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  })
 }
 
 // GET endpoint to check last sync status
