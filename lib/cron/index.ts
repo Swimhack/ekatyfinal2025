@@ -5,6 +5,7 @@
 
 import { startDailySync } from './restaurant-sync'
 import { startHourlyMonitoring } from './hourly-monitoring'
+import { startFreshnessWatchdog } from './freshness-watchdog'
 
 /**
  * Start all cron jobs
@@ -19,6 +20,10 @@ export function startAllCronJobs() {
 
   // Start hourly monitoring
   startHourlyMonitoring()
+
+  // Start freshness watchdog (4:30 AM, re-verifies stale profiles
+  // and deactivates permanently closed restaurants)
+  startFreshnessWatchdog()
 
   console.log('='.repeat(60))
   console.log('✅ All cron jobs started successfully')
@@ -42,3 +47,4 @@ export function initializeCronJobs() {
 // Export individual cron jobs for manual testing
 export * from './restaurant-sync'
 export * from './hourly-monitoring'
+export * from './freshness-watchdog'
