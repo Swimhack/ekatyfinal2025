@@ -1,56 +1,33 @@
 {
+  "_note": "Profiles fact-checked July 2026 against Yelp, official restaurant sites, and live listings. Removed entries that were fabricated, outside Katy, or permanently closed (The Oaks Kitchen + Bar, Pho One, Pappa's BBQ, Whiskey River, Thai Cottage, The Republic Grille). Hours present only where a source stated them. lat/lng are address-level approximations; prefer the Google Places import for authoritative data.",
   "restaurants": [
-    {
-      "name": "The Oaks Kitchen + Bar",
-      "slug": "the-oaks-kitchen-bar",
-      "description": "Upscale American cuisine with a modern twist. Known for their craft cocktails and weekend brunch.",
-      "cuisineType": "American",
-      "priceRange": "$$$",
-      "rating": 4.7,
-      "image": "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&h=600",
-      "address": "23003 Cinco Ranch Blvd",
-      "city": "Katy",
-      "state": "TX",
-      "zip": "77494",
-      "phone": "(281) 394-5600",
-      "website": "https://theoakskitchenbar.com",
-      "hours": {
-        "mon": "11:00 AM - 10:00 PM",
-        "tue": "11:00 AM - 10:00 PM",
-        "wed": "11:00 AM - 10:00 PM",
-        "thu": "11:00 AM - 10:00 PM",
-        "fri": "11:00 AM - 11:00 PM",
-        "sat": "10:00 AM - 11:00 PM",
-        "sun": "10:00 AM - 9:00 PM"
-      },
-      "features": ["Outdoor Seating", "Full Bar", "Weekend Brunch", "Private Dining"],
-      "tags": ["upscale", "date-night", "brunch", "cocktails"]
-    },
     {
       "name": "Dish Society",
       "slug": "dish-society",
       "description": "Farm-to-table restaurant focusing on locally sourced ingredients and healthy options.",
       "cuisineType": "American",
       "priceRange": "$$",
-      "rating": 4.5,
       "image": "https://images.unsplash.com/photo-1424847651672-bf20a4b0982b?w=800&h=600",
-      "address": "23501 Cinco Ranch Blvd",
+      "address": "2643 Commercial Center Blvd, Ste B350",
       "city": "Katy",
       "state": "TX",
       "zip": "77494",
-      "phone": "(281) 665-3474",
-      "website": "https://dish-society.com",
-      "hours": {
-        "mon": "7:00 AM - 9:00 PM",
-        "tue": "7:00 AM - 9:00 PM",
-        "wed": "7:00 AM - 9:00 PM",
-        "thu": "7:00 AM - 9:00 PM",
-        "fri": "7:00 AM - 10:00 PM",
-        "sat": "7:00 AM - 10:00 PM",
-        "sun": "7:00 AM - 9:00 PM"
-      },
-      "features": ["Healthy Options", "Vegetarian Friendly", "Gluten-Free Options", "Kid-Friendly"],
-      "tags": ["healthy", "farm-to-table", "breakfast", "family-friendly"]
+      "lat": 29.7398,
+      "lng": -95.7702,
+      "phone": "(281) 394-7555",
+      "website": "https://dishsociety.com",
+      "features": [
+        "Healthy Options",
+        "Vegetarian Friendly",
+        "Gluten-Free Options",
+        "Kid-Friendly"
+      ],
+      "tags": [
+        "healthy",
+        "farm-to-table",
+        "breakfast",
+        "family-friendly"
+      ]
     },
     {
       "name": "Los Cucos Mexican Cafe",
@@ -58,25 +35,27 @@
       "description": "Authentic Tex-Mex cuisine with generous portions and famous margaritas.",
       "cuisineType": "Mexican",
       "priceRange": "$$",
-      "rating": 4.3,
       "image": "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&h=600",
       "address": "5831 Highway Blvd",
       "city": "Katy",
       "state": "TX",
       "zip": "77494",
-      "phone": "(281) 391-0903",
+      "lat": 29.7857,
+      "lng": -95.829,
+      "phone": "(281) 391-9466",
       "website": "https://loscucos.com",
-      "hours": {
-        "mon": "11:00 AM - 9:00 PM",
-        "tue": "11:00 AM - 9:00 PM",
-        "wed": "11:00 AM - 9:00 PM",
-        "thu": "11:00 AM - 9:00 PM",
-        "fri": "11:00 AM - 10:00 PM",
-        "sat": "11:00 AM - 10:00 PM",
-        "sun": "11:00 AM - 9:00 PM"
-      },
-      "features": ["Happy Hour", "Patio Seating", "Full Bar", "Catering"],
-      "tags": ["tex-mex", "margaritas", "family-friendly", "casual"]
+      "features": [
+        "Happy Hour",
+        "Patio Seating",
+        "Full Bar",
+        "Catering"
+      ],
+      "tags": [
+        "tex-mex",
+        "margaritas",
+        "family-friendly",
+        "casual"
+      ]
     },
     {
       "name": "Perry's Steakhouse & Grille",
@@ -84,103 +63,90 @@
       "description": "Upscale steakhouse famous for their pork chop and extensive wine selection.",
       "cuisineType": "Steakhouse",
       "priceRange": "$$$$",
-      "rating": 4.8,
       "image": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800&h=600",
-      "address": "23501 Cinco Ranch Blvd Suite B100",
+      "address": "23501 Cinco Ranch Blvd, Ste Q100",
       "city": "Katy",
       "state": "TX",
       "zip": "77494",
+      "lat": 29.739,
+      "lng": -95.7715,
       "phone": "(281) 347-3600",
       "website": "https://perryssteakhouse.com",
-      "hours": {
-        "mon": "4:00 PM - 10:00 PM",
-        "tue": "4:00 PM - 10:00 PM",
-        "wed": "4:00 PM - 10:00 PM",
-        "thu": "4:00 PM - 10:00 PM",
-        "fri": "11:00 AM - 10:00 PM",
-        "sat": "4:00 PM - 10:00 PM",
-        "sun": "4:00 PM - 9:00 PM"
-      },
-      "features": ["Private Dining", "Wine Selection", "Valet Parking", "Bar"],
-      "tags": ["fine-dining", "steakhouse", "special-occasion", "business-dining"]
-    },
-    {
-      "name": "Pho One",
-      "slug": "pho-one",
-      "description": "Authentic Vietnamese cuisine specializing in pho and traditional dishes.",
-      "cuisineType": "Vietnamese",
-      "priceRange": "$",
-      "rating": 4.4,
-      "image": "https://images.unsplash.com/photo-1555126634-323283e090fa?w=800&h=600",
-      "address": "20660 Westheimer Pkwy",
-      "city": "Katy",
-      "state": "TX",
-      "zip": "77450",
-      "phone": "(281) 646-9888",
-      "website": "",
-      "hours": {
-        "mon": "10:00 AM - 9:30 PM",
-        "tue": "Closed",
-        "wed": "10:00 AM - 9:30 PM",
-        "thu": "10:00 AM - 9:30 PM",
-        "fri": "10:00 AM - 10:00 PM",
-        "sat": "10:00 AM - 10:00 PM",
-        "sun": "10:00 AM - 9:30 PM"
-      },
-      "features": ["Vegetarian Options", "Takeout", "Casual Dining"],
-      "tags": ["vietnamese", "pho", "authentic", "casual"]
+      "features": [
+        "Private Dining",
+        "Wine Selection",
+        "Valet Parking",
+        "Bar"
+      ],
+      "tags": [
+        "fine-dining",
+        "steakhouse",
+        "special-occasion",
+        "business-dining"
+      ]
     },
     {
       "name": "Babin's Seafood House",
       "slug": "babins-seafood-house",
-      "description": "Family-owned Cajun seafood restaurant serving fresh Gulf Coast favorites.",
+      "description": "Cajun-inspired seafood house serving fresh Gulf Coast favorites.",
       "cuisineType": "Seafood",
-      "priceRange": "$$",
-      "rating": 4.2,
+      "priceRange": "$$$",
       "image": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600",
-      "address": "22625 Colonial Pkwy",
+      "address": "21851 Katy Fwy",
       "city": "Katy",
       "state": "TX",
-      "zip": "77449",
-      "phone": "(281) 392-7950",
-      "website": "https://babinsseafood.com",
-      "hours": {
-        "mon": "11:00 AM - 9:00 PM",
-        "tue": "11:00 AM - 9:00 PM",
-        "wed": "11:00 AM - 9:00 PM",
-        "thu": "11:00 AM - 9:00 PM",
-        "fri": "11:00 AM - 10:00 PM",
-        "sat": "11:00 AM - 10:00 PM",
-        "sun": "11:00 AM - 9:00 PM"
-      },
-      "features": ["Fresh Seafood", "Cajun Cuisine", "Family-Friendly", "Full Bar"],
-      "tags": ["seafood", "cajun", "family-owned", "local-favorite"]
+      "zip": "77450",
+      "lat": 29.786,
+      "lng": -95.751,
+      "phone": "(281) 829-9200",
+      "website": "https://www.babinsseafood.com",
+      "features": [
+        "Fresh Seafood",
+        "Cajun Cuisine",
+        "Family-Friendly",
+        "Full Bar"
+      ],
+      "tags": [
+        "seafood",
+        "cajun",
+        "local-favorite"
+      ]
     },
     {
       "name": "Local Table",
       "slug": "local-table",
-      "description": "Neighborhood restaurant with American comfort food and craft beers.",
+      "description": "Neighborhood restaurant serving American and Mediterranean-influenced dishes.",
       "cuisineType": "American",
       "priceRange": "$$",
-      "rating": 4.5,
       "image": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=600",
-      "address": "13131 Westheimer Rd",
-      "city": "Houston",
+      "address": "24033 Cinco Ranch Blvd",
+      "city": "Katy",
       "state": "TX",
-      "zip": "77077",
-      "phone": "(832) 321-7154",
-      "website": "https://localtablehouston.com",
+      "zip": "77494",
+      "lat": 29.733,
+      "lng": -95.7745,
+      "phone": "(832) 913-6150",
+      "website": "https://eatatlocaltable.com",
       "hours": {
-        "mon": "11:00 AM - 10:00 PM",
-        "tue": "11:00 AM - 10:00 PM",
-        "wed": "11:00 AM - 10:00 PM",
+        "mon": "11:00 AM - 9:00 PM",
+        "tue": "11:00 AM - 9:00 PM",
+        "wed": "11:00 AM - 9:00 PM",
         "thu": "11:00 AM - 10:00 PM",
-        "fri": "11:00 AM - 11:00 PM",
-        "sat": "10:00 AM - 11:00 PM",
-        "sun": "10:00 AM - 10:00 PM"
+        "fri": "11:00 AM - 10:00 PM",
+        "sat": "10:00 AM - 10:00 PM",
+        "sun": "10:00 AM - 9:00 PM"
       },
-      "features": ["Craft Beer", "Brunch", "Patio", "Sports TV"],
-      "tags": ["comfort-food", "craft-beer", "neighborhood", "casual"]
+      "features": [
+        "Brunch",
+        "Patio",
+        "Catering",
+        "Private Events"
+      ],
+      "tags": [
+        "comfort-food",
+        "neighborhood",
+        "casual"
+      ]
     },
     {
       "name": "Antonia's Cucina Italiana",
@@ -188,25 +154,36 @@
       "description": "Family-style Italian restaurant with homemade pasta and traditional recipes.",
       "cuisineType": "Italian",
       "priceRange": "$$$",
-      "rating": 4.6,
       "image": "https://images.unsplash.com/photo-1595295333158-4742f28fbd85?w=800&h=600",
-      "address": "23651 Westheimer Pkwy",
+      "address": "2001 Katy Mills Blvd, Ste A",
       "city": "Katy",
       "state": "TX",
       "zip": "77494",
-      "phone": "(281) 712-6222",
-      "website": "https://antoniascucinaitaliana.com",
+      "lat": 29.78,
+      "lng": -95.81,
+      "phone": "(281) 644-6000",
+      "website": "https://antonias.us",
       "hours": {
         "mon": "Closed",
-        "tue": "11:00 AM - 9:00 PM",
-        "wed": "11:00 AM - 9:00 PM",
-        "thu": "11:00 AM - 9:00 PM",
-        "fri": "11:00 AM - 10:00 PM",
-        "sat": "11:00 AM - 10:00 PM",
-        "sun": "11:00 AM - 9:00 PM"
+        "tue": "11:30 AM - 8:30 PM",
+        "wed": "11:30 AM - 8:30 PM",
+        "thu": "11:30 AM - 8:30 PM",
+        "fri": "11:30 AM - 9:30 PM",
+        "sat": "11:30 AM - 9:30 PM",
+        "sun": "12:00 PM - 8:00 PM"
       },
-      "features": ["Wine Bar", "Private Events", "Homemade Pasta", "Romantic"],
-      "tags": ["italian", "pasta", "wine", "date-night"]
+      "features": [
+        "Wine Bar",
+        "Private Events",
+        "Homemade Pasta",
+        "Romantic"
+      ],
+      "tags": [
+        "italian",
+        "pasta",
+        "wine",
+        "date-night"
+      ]
     },
     {
       "name": "BB's Tex-Orleans",
@@ -214,103 +191,61 @@
       "description": "Cajun restaurant featuring po'boys, gumbo, and crawfish with a fun atmosphere.",
       "cuisineType": "Cajun",
       "priceRange": "$$",
-      "rating": 4.3,
       "image": "https://images.unsplash.com/photo-1606489129187-1eee19a0a103?w=800&h=600",
-      "address": "406 W Grand Pkwy S",
+      "address": "406 W Grand Pkwy S, Ste 400",
       "city": "Katy",
       "state": "TX",
       "zip": "77494",
-      "phone": "(281) 394-7474",
+      "lat": 29.777,
+      "lng": -95.7885,
+      "phone": "(281) 665-7843",
       "website": "https://bbstexorleans.com",
       "hours": {
         "mon": "11:00 AM - 10:00 PM",
         "tue": "11:00 AM - 10:00 PM",
         "wed": "11:00 AM - 10:00 PM",
         "thu": "11:00 AM - 10:00 PM",
-        "fri": "11:00 AM - 11:00 PM",
-        "sat": "11:00 AM - 11:00 PM",
+        "fri": "11:00 AM - 10:00 PM",
+        "sat": "11:00 AM - 10:00 PM",
         "sun": "11:00 AM - 10:00 PM"
       },
-      "features": ["Live Music", "Happy Hour", "Patio", "Full Bar"],
-      "tags": ["cajun", "crawfish", "live-music", "fun-atmosphere"]
+      "features": [
+        "Happy Hour",
+        "Patio",
+        "Full Bar"
+      ],
+      "tags": [
+        "cajun",
+        "crawfish",
+        "fun-atmosphere"
+      ]
     },
     {
       "name": "Sushi Hana Japanese Kitchen",
       "slug": "sushi-hana",
-      "description": "Contemporary Japanese restaurant with fresh sushi and hibachi tables.",
+      "description": "Japanese restaurant and sushi bar serving the Katy area since 2003.",
       "cuisineType": "Japanese",
       "priceRange": "$$",
-      "rating": 4.5,
       "image": "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=800&h=600",
-      "address": "23501 Cinco Ranch Blvd",
+      "address": "1638 S Mason Rd",
       "city": "Katy",
       "state": "TX",
-      "zip": "77494",
-      "phone": "(281) 391-8885",
-      "website": "",
-      "hours": {
-        "mon": "11:00 AM - 10:00 PM",
-        "tue": "11:00 AM - 10:00 PM",
-        "wed": "11:00 AM - 10:00 PM",
-        "thu": "11:00 AM - 10:00 PM",
-        "fri": "11:00 AM - 10:30 PM",
-        "sat": "11:00 AM - 10:30 PM",
-        "sun": "12:00 PM - 10:00 PM"
-      },
-      "features": ["Sushi Bar", "Hibachi", "Sake Selection", "Fresh Fish"],
-      "tags": ["japanese", "sushi", "hibachi", "fresh"]
-    },
-    {
-      "name": "Pappa's BBQ",
-      "slug": "pappas-bbq",
-      "description": "Texas-style BBQ with slow-smoked meats and homemade sides.",
-      "cuisineType": "BBQ",
-      "priceRange": "$$",
-      "rating": 4.1,
-      "image": "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=800&h=600",
-      "address": "19660 Katy Fwy",
-      "city": "Houston",
-      "state": "TX",
-      "zip": "77094",
-      "phone": "(281) 579-5535",
-      "website": "https://pappasbbq.com",
-      "hours": {
-        "mon": "10:30 AM - 10:00 PM",
-        "tue": "10:30 AM - 10:00 PM",
-        "wed": "10:30 AM - 10:00 PM",
-        "thu": "10:30 AM - 10:00 PM",
-        "fri": "10:30 AM - 11:00 PM",
-        "sat": "10:30 AM - 11:00 PM",
-        "sun": "10:30 AM - 10:00 PM"
-      },
-      "features": ["Catering", "Family Packs", "Drive-Thru", "Texas BBQ"],
-      "tags": ["bbq", "smoked-meats", "texas-style", "casual"]
-    },
-    {
-      "name": "Whiskey River",
-      "slug": "whiskey-river",
-      "description": "Sports bar and grill with Texas-sized portions and extensive whiskey selection.",
-      "cuisineType": "American",
-      "priceRange": "$$",
-      "rating": 4.0,
-      "image": "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&h=600",
-      "address": "23501 Cinco Ranch Blvd",
-      "city": "Katy",
-      "state": "TX",
-      "zip": "77494",
-      "phone": "(281) 712-1999",
-      "website": "https://whiskeyriversaloon.com",
-      "hours": {
-        "mon": "11:00 AM - 12:00 AM",
-        "tue": "11:00 AM - 12:00 AM",
-        "wed": "11:00 AM - 12:00 AM",
-        "thu": "11:00 AM - 12:00 AM",
-        "fri": "11:00 AM - 2:00 AM",
-        "sat": "11:00 AM - 2:00 AM",
-        "sun": "11:00 AM - 12:00 AM"
-      },
-      "features": ["Sports Bar", "Live Music", "Late Night", "Whiskey Selection"],
-      "tags": ["sports-bar", "whiskey", "nightlife", "live-music"]
+      "zip": "77450",
+      "lat": 29.756,
+      "lng": -95.75,
+      "phone": "(281) 395-8899",
+      "website": "https://www.sushihanakaty.com",
+      "features": [
+        "Sushi Bar",
+        "Sake Selection",
+        "Fresh Fish",
+        "Bento Lunch Specials"
+      ],
+      "tags": [
+        "japanese",
+        "sushi",
+        "fresh"
+      ]
     },
     {
       "name": "Alicia's Mexican Grille",
@@ -318,51 +253,36 @@
       "description": "Upscale Mexican restaurant with authentic flavors and handcrafted cocktails.",
       "cuisineType": "Mexican",
       "priceRange": "$$$",
-      "rating": 4.4,
       "image": "https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?w=800&h=600",
-      "address": "25725 Katy Mills Pkwy",
+      "address": "25725 Katy Fwy",
       "city": "Katy",
       "state": "TX",
       "zip": "77494",
+      "lat": 29.7838,
+      "lng": -95.8265,
       "phone": "(281) 347-1800",
-      "website": "https://aliciasmexican.com",
+      "website": "https://aliciasmexicangrille.com",
       "hours": {
         "mon": "11:00 AM - 9:00 PM",
         "tue": "11:00 AM - 9:00 PM",
         "wed": "11:00 AM - 9:00 PM",
-        "thu": "11:00 AM - 10:00 PM",
+        "thu": "11:00 AM - 9:00 PM",
         "fri": "11:00 AM - 10:00 PM",
         "sat": "11:00 AM - 10:00 PM",
         "sun": "11:00 AM - 9:00 PM"
       },
-      "features": ["Tequila Bar", "Patio", "Happy Hour", "Private Dining"],
-      "tags": ["upscale-mexican", "tequila", "cocktails", "authentic"]
-    },
-    {
-      "name": "Thai Cottage",
-      "slug": "thai-cottage",
-      "description": "Authentic Thai cuisine in a cozy setting with traditional decor.",
-      "cuisineType": "Thai",
-      "priceRange": "$$",
-      "rating": 4.3,
-      "image": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&h=600",
-      "address": "21792 Katy Fwy",
-      "city": "Katy",
-      "state": "TX",
-      "zip": "77450",
-      "phone": "(281) 392-9650",
-      "website": "",
-      "hours": {
-        "mon": "11:00 AM - 9:30 PM",
-        "tue": "11:00 AM - 9:30 PM",
-        "wed": "11:00 AM - 9:30 PM",
-        "thu": "11:00 AM - 9:30 PM",
-        "fri": "11:00 AM - 10:00 PM",
-        "sat": "11:00 AM - 10:00 PM",
-        "sun": "11:00 AM - 9:30 PM"
-      },
-      "features": ["Vegetarian Options", "Spicy Levels", "Lunch Specials", "Authentic"],
-      "tags": ["thai", "authentic", "spicy", "cozy"]
+      "features": [
+        "Tequila Bar",
+        "Patio",
+        "Happy Hour",
+        "Private Dining"
+      ],
+      "tags": [
+        "upscale-mexican",
+        "tequila",
+        "cocktails",
+        "authentic"
+      ]
     },
     {
       "name": "Kolache Factory",
@@ -370,13 +290,14 @@
       "description": "Czech-inspired bakery famous for sweet and savory kolaches, perfect for breakfast.",
       "cuisineType": "Bakery",
       "priceRange": "$",
-      "rating": 4.2,
       "image": "https://images.unsplash.com/photo-1509722747041-616f39b57569?w=800&h=600",
-      "address": "24230 Westheimer Pkwy",
+      "address": "23240 Westheimer Pkwy, Ste C",
       "city": "Katy",
       "state": "TX",
       "zip": "77494",
-      "phone": "(281) 644-6200",
+      "lat": 29.7205,
+      "lng": -95.7615,
+      "phone": "(281) 347-2253",
       "website": "https://kolachefactory.com",
       "hours": {
         "mon": "6:00 AM - 2:00 PM",
@@ -387,34 +308,45 @@
         "sat": "6:00 AM - 2:00 PM",
         "sun": "7:00 AM - 2:00 PM"
       },
-      "features": ["Breakfast", "Coffee", "Bakery", "Quick Service"],
-      "tags": ["breakfast", "bakery", "kolaches", "coffee"]
+      "features": [
+        "Breakfast",
+        "Coffee",
+        "Bakery",
+        "Quick Service"
+      ],
+      "tags": [
+        "breakfast",
+        "bakery",
+        "kolaches",
+        "coffee"
+      ]
     },
     {
       "name": "Midway BBQ",
       "slug": "midway-bbq",
-      "description": "Old-school Texas BBQ joint serving smoked meats since 1939.",
+      "description": "Old-school Texas BBQ joint and longtime Katy institution on Highway Blvd.",
       "cuisineType": "BBQ",
       "priceRange": "$",
-      "rating": 4.5,
       "image": "https://images.unsplash.com/photo-1584178994280-eb837f4f2c14?w=800&h=600",
-      "address": "6025 Hwy Blvd",
+      "address": "6025 Highway Blvd",
       "city": "Katy",
       "state": "TX",
       "zip": "77494",
-      "phone": "(281) 391-2271",
-      "website": "",
-      "hours": {
-        "mon": "10:30 AM - 8:00 PM",
-        "tue": "10:30 AM - 8:00 PM",
-        "wed": "10:30 AM - 8:00 PM",
-        "thu": "10:30 AM - 8:00 PM",
-        "fri": "10:30 AM - 8:00 PM",
-        "sat": "10:30 AM - 8:00 PM",
-        "sun": "Closed"
-      },
-      "features": ["Traditional BBQ", "Local Institution", "Takeout", "Cash Only"],
-      "tags": ["bbq", "traditional", "local-legend", "affordable"]
+      "lat": 29.786,
+      "lng": -95.832,
+      "phone": "(281) 391-2830",
+      "website": "https://www.midwaybbqkatytx.com",
+      "features": [
+        "Traditional BBQ",
+        "Local Institution",
+        "Takeout"
+      ],
+      "tags": [
+        "bbq",
+        "traditional",
+        "local-legend",
+        "affordable"
+      ]
     },
     {
       "name": "La Madeleine",
@@ -422,51 +354,36 @@
       "description": "French-inspired cafe with fresh-baked breads, soups, and salads.",
       "cuisineType": "French",
       "priceRange": "$$",
-      "rating": 4.1,
       "image": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&h=600",
-      "address": "5000 Katy Mills Cir",
+      "address": "23322 Mercantile Pkwy",
       "city": "Katy",
       "state": "TX",
-      "zip": "77494",
-      "phone": "(281) 644-7800",
+      "zip": "77449",
+      "lat": 29.783,
+      "lng": -95.776,
+      "phone": "(281) 395-2888",
       "website": "https://lamadeleine.com",
       "hours": {
-        "mon": "6:30 AM - 9:00 PM",
-        "tue": "6:30 AM - 9:00 PM",
-        "wed": "6:30 AM - 9:00 PM",
-        "thu": "6:30 AM - 9:00 PM",
-        "fri": "6:30 AM - 10:00 PM",
-        "sat": "6:30 AM - 10:00 PM",
-        "sun": "6:30 AM - 9:00 PM"
+        "mon": "7:00 AM - 9:00 PM",
+        "tue": "7:00 AM - 9:00 PM",
+        "wed": "7:00 AM - 9:00 PM",
+        "thu": "7:00 AM - 9:00 PM",
+        "fri": "7:00 AM - 10:00 PM",
+        "sat": "7:00 AM - 10:00 PM",
+        "sun": "7:00 AM - 9:00 PM"
       },
-      "features": ["Bakery", "Coffee", "French Cuisine", "Casual"],
-      "tags": ["french", "cafe", "bakery", "lunch"]
-    },
-    {
-      "name": "The Republic Grille",
-      "slug": "the-republic-grille",
-      "description": "Texas-themed restaurant with live music and a great selection of local beers.",
-      "cuisineType": "American",
-      "priceRange": "$$",
-      "rating": 4.2,
-      "image": "https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=800&h=600",
-      "address": "9920 Gaston Rd",
-      "city": "Katy",
-      "state": "TX",
-      "zip": "77494",
-      "phone": "(281) 665-7500",
-      "website": "https://therepublicgrille.com",
-      "hours": {
-        "mon": "11:00 AM - 10:00 PM",
-        "tue": "11:00 AM - 10:00 PM",
-        "wed": "11:00 AM - 10:00 PM",
-        "thu": "11:00 AM - 10:00 PM",
-        "fri": "11:00 AM - 11:00 PM",
-        "sat": "11:00 AM - 11:00 PM",
-        "sun": "11:00 AM - 9:00 PM"
-      },
-      "features": ["Live Music", "Texas Beer", "Patio", "Family-Friendly"],
-      "tags": ["texas", "live-music", "beer", "family"]
+      "features": [
+        "Bakery",
+        "Coffee",
+        "French Cuisine",
+        "Casual"
+      ],
+      "tags": [
+        "french",
+        "cafe",
+        "bakery",
+        "lunch"
+      ]
     },
     {
       "name": "Torchy's Tacos",
@@ -474,13 +391,14 @@
       "description": "Damn good tacos with creative combinations and a fun, quirky atmosphere.",
       "cuisineType": "Mexican",
       "priceRange": "$",
-      "rating": 4.3,
       "image": "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&h=600",
-      "address": "24433 Katy Fwy",
+      "address": "23501 Cinco Ranch Blvd, Ste N100",
       "city": "Katy",
       "state": "TX",
       "zip": "77494",
-      "phone": "(713) 904-4990",
+      "lat": 29.7392,
+      "lng": -95.771,
+      "phone": "(281) 394-7808",
       "website": "https://torchystacos.com",
       "hours": {
         "mon": "10:00 AM - 10:00 PM",
@@ -488,11 +406,21 @@
         "wed": "10:00 AM - 10:00 PM",
         "thu": "10:00 AM - 10:00 PM",
         "fri": "10:00 AM - 11:00 PM",
-        "sat": "10:00 AM - 11:00 PM",
-        "sun": "10:00 AM - 10:00 PM"
+        "sat": "9:00 AM - 11:00 PM",
+        "sun": "9:00 AM - 10:00 PM"
       },
-      "features": ["Creative Tacos", "Queso", "Margaritas", "Casual"],
-      "tags": ["tacos", "casual", "quick", "creative"]
+      "features": [
+        "Creative Tacos",
+        "Queso",
+        "Margaritas",
+        "Casual"
+      ],
+      "tags": [
+        "tacos",
+        "casual",
+        "quick",
+        "creative"
+      ]
     },
     {
       "name": "Vida Mariscos",
@@ -500,25 +428,27 @@
       "description": "Authentic Mexican seafood with ceviches, aguachiles, and coastal favorites.",
       "cuisineType": "Seafood",
       "priceRange": "$$",
-      "rating": 4.6,
       "image": "https://images.unsplash.com/photo-1535399831218-d5bd36d1a6b3?w=800&h=600",
-      "address": "21810 Kingsland Blvd",
+      "address": "902 W Grand Pkwy S",
       "city": "Katy",
       "state": "TX",
-      "zip": "77450",
-      "phone": "(281) 574-4900",
-      "website": "https://vidamariscos.com",
-      "hours": {
-        "mon": "11:00 AM - 10:00 PM",
-        "tue": "11:00 AM - 10:00 PM",
-        "wed": "11:00 AM - 10:00 PM",
-        "thu": "11:00 AM - 10:00 PM",
-        "fri": "11:00 AM - 11:00 PM",
-        "sat": "11:00 AM - 11:00 PM",
-        "sun": "11:00 AM - 10:00 PM"
-      },
-      "features": ["Mexican Seafood", "Ceviche", "Full Bar", "Vibrant Atmosphere"],
-      "tags": ["seafood", "mexican", "ceviche", "fresh"]
+      "zip": "77494",
+      "lat": 29.77,
+      "lng": -95.789,
+      "phone": "(281) 505-1970",
+      "website": "https://www.vidamariscos.com",
+      "features": [
+        "Mexican Seafood",
+        "Ceviche",
+        "Full Bar",
+        "Vibrant Atmosphere"
+      ],
+      "tags": [
+        "seafood",
+        "mexican",
+        "ceviche",
+        "fresh"
+      ]
     }
   ]
 }

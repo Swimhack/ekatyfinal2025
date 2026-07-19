@@ -61,16 +61,21 @@ async function seedRestaurants() {
       '$$$$': 'PREMIUM'
     }
     
-    // Convert hours object to JSON string
-    const hoursJson = JSON.stringify({
-      monday: restaurant.hours.mon === 'Closed' ? { closed: true } : { open: restaurant.hours.mon.split(' - ')[0], close: restaurant.hours.mon.split(' - ')[1] },
-      tuesday: restaurant.hours.tue === 'Closed' ? { closed: true } : { open: restaurant.hours.tue.split(' - ')[0], close: restaurant.hours.tue.split(' - ')[1] },
-      wednesday: restaurant.hours.wed === 'Closed' ? { closed: true } : { open: restaurant.hours.wed.split(' - ')[0], close: restaurant.hours.wed.split(' - ')[1] },
-      thursday: restaurant.hours.thu === 'Closed' ? { closed: true } : { open: restaurant.hours.thu.split(' - ')[0], close: restaurant.hours.thu.split(' - ')[1] },
-      friday: restaurant.hours.fri === 'Closed' ? { closed: true } : { open: restaurant.hours.fri.split(' - ')[0], close: restaurant.hours.fri.split(' - ')[1] },
-      saturday: restaurant.hours.sat === 'Closed' ? { closed: true } : { open: restaurant.hours.sat.split(' - ')[0], close: restaurant.hours.sat.split(' - ')[1] },
-      sunday: restaurant.hours.sun === 'Closed' ? { closed: true } : { open: restaurant.hours.sun.split(' - ')[0], close: restaurant.hours.sun.split(' - ')[1] }
-    })
+    // Convert hours object to JSON string; hours are only present in the
+    // seed data when a source stated them, so '{}' means "unknown"
+    const parseDay = (day?: string) =>
+      !day ? null : day === 'Closed' ? { closed: true } : { open: day.split(' - ')[0], close: day.split(' - ')[1] }
+    const hoursJson = restaurant.hours
+      ? JSON.stringify({
+          monday: parseDay(restaurant.hours.mon),
+          tuesday: parseDay(restaurant.hours.tue),
+          wednesday: parseDay(restaurant.hours.wed),
+          thursday: parseDay(restaurant.hours.thu),
+          friday: parseDay(restaurant.hours.fri),
+          saturday: parseDay(restaurant.hours.sat),
+          sunday: parseDay(restaurant.hours.sun)
+        })
+      : '{}'
     
     const data = {
       name: restaurant.name,
@@ -80,22 +85,22 @@ async function seedRestaurants() {
       city: restaurant.city,
       state: restaurant.state,
       zipCode: restaurant.zip,
-      latitude: 29.7752 + (Math.random() * 0.1 - 0.05), // Around Katy area
-      longitude: -95.8244 + (Math.random() * 0.1 - 0.05),
+      latitude: restaurant.lat ?? 29.7752, // seed coords are address-level approximations
+      longitude: restaurant.lng ?? -95.8244,
       phone: restaurant.phone,
       website: restaurant.website || null,
-      email: `contact@${restaurant.slug}.com`,
+      email: null,
       categories: restaurant.cuisineType,
       cuisineTypes: restaurant.tags.join(','),
       hours: hoursJson,
       priceLevel: priceMap[restaurant.priceRange] || 'MODERATE',
       photos: restaurant.image,
       logoUrl: restaurant.image,
-      featured: restaurant.rating >= 4.5,
+      featured: (restaurant.rating ?? 0) >= 4.5,
       verified: true,
       active: true,
-      rating: restaurant.rating,
-      reviewCount: Math.floor(Math.random() * 200) + 50,
+      rating: restaurant.rating ?? null,
+      reviewCount: 0,
       source: 'manual',
       sourceId: null,
       metadata: JSON.stringify({
