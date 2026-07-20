@@ -94,8 +94,10 @@ async function seedRestaurants() {
       cuisineTypes: restaurant.tags.join(','),
       hours: hoursJson,
       priceLevel: priceMap[restaurant.priceRange] || 'MODERATE',
-      photos: restaurant.image,
-      logoUrl: restaurant.image,
+      // No placeholder imagery: real photos arrive via the Google Places
+      // import/watchdog, and the UI has a graceful no-photo fallback
+      photos: restaurant.image || '',
+      logoUrl: restaurant.image || null,
       featured: (restaurant.rating ?? 0) >= 4.5,
       verified: true,
       active: true,
