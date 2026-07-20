@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { matchesCategory } from '@/lib/search'
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,11 +27,13 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Category filter
+    // Category filter — broad case-insensitive DB prefilter; precise
+    // whole-word matching applied after the query
     if (categories.length > 0) {
-      where.OR = categories.map((cat: string) => ({
-        categories: { contains: cat }
-      }))
+      where.OR = categories.flatMap((cat: string) => [
+        { categories: { contains: cat, mode: 'insensitive' as const } },
+        { cuisineTypes: { contains: cat, mode: 'insensitive' as const } }
+      ])
     }
     
     // Price level filter
@@ -51,6 +54,15 @@ export async function POST(request: NextRequest) {
       }
     })
     
+    // Precise category matching ("Bar" must not match "Barbecue")
+    if (categories.length > 0) {
+      candidates = candidates.filter(restaurant =>
+        categories.some((cat: string) =>
+          matchesCategory([restaurant.categories, restaurant.cuisineTypes], cat)
+        )
+      )
+    }
+
     // Filter by distance if coordinates provided
     if (lat && lng) {
       const userLat = parseFloat(lat)

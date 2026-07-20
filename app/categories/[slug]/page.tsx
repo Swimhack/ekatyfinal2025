@@ -6,6 +6,7 @@ import {
   breadcrumbJsonLd,
   restaurantItemListJsonLd,
 } from '@/lib/seo'
+import { matchesCategory } from '@/lib/search'
 import CategoryClient from './CategoryClient'
 
 export const revalidate = 3600
@@ -16,18 +17,20 @@ function categoryForSlug(slug: string) {
 
 async function getCategoryRestaurants(categoryName: string) {
   try {
-    return await prisma.restaurant.findMany({
+    const candidates = await prisma.restaurant.findMany({
       where: {
         active: true,
         OR: [
-          { categories: { contains: categoryName } },
-          { cuisineTypes: { contains: categoryName } },
+          { categories: { contains: categoryName, mode: 'insensitive' } },
+          { cuisineTypes: { contains: categoryName, mode: 'insensitive' } },
         ],
       },
       orderBy: { rating: 'desc' },
-      take: 25,
-      select: { name: true, slug: true },
+      select: { name: true, slug: true, categories: true, cuisineTypes: true },
     })
+    return candidates
+      .filter((r) => matchesCategory([r.categories, r.cuisineTypes], categoryName))
+      .slice(0, 25)
   } catch (error) {
     console.error('SEO: failed to load category restaurants:', error)
     return []
