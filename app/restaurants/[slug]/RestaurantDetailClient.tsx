@@ -114,12 +114,33 @@ export default function RestaurantDetailClient() {
   const [isFavorite, setIsFavorite] = useState(false)
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [heroImageFailed, setHeroImageFailed] = useState(false)
 
   useEffect(() => {
-    if (params.slug) {
-      fetchRestaurant(params.slug as string)
-      checkFavoriteStatus()
-      checkAdminStatus()
+    if (!params.slug) return
+    // Guard against a stale request resolving after client-side navigation
+    // to another restaurant and overwriting the newer page's data
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      setHeroImageFailed(false)
+      try {
+        const response = await fetch(`/api/restaurants/${params.slug}`)
+        if (!cancelled && response.ok) {
+          const data = await response.json()
+          setRestaurant(data)
+        }
+      } catch (error) {
+        if (!cancelled) console.error('Error fetching restaurant:', error)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    checkFavoriteStatus()
+    checkAdminStatus()
+    return () => {
+      cancelled = true
     }
   }, [params.slug])
 
@@ -133,31 +154,26 @@ export default function RestaurantDetailClient() {
     }
   }
 
-  const fetchRestaurant = async (slug: string) => {
+  // localStorage can hold corrupted or non-array JSON; never let it throw
+  const readFavorites = (): string[] => {
     try {
-      const response = await fetch(`/api/restaurants/${slug}`)
-      if (response.ok) {
-        const data = await response.json()
-        setRestaurant(data)
-      }
-    } catch (error) {
-      console.error('Error fetching restaurant:', error)
-    } finally {
-      setLoading(false)
+      const parsed = JSON.parse(localStorage.getItem('favorites') || '[]')
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
     }
   }
 
   const checkFavoriteStatus = () => {
     if (params.slug && typeof window !== 'undefined') {
-      const favorites = JSON.parse(localStorage.getItem('favorites') || '[]')
-      setIsFavorite(favorites.includes(params.slug as string))
+      setIsFavorite(readFavorites().includes(params.slug as string))
     }
   }
 
   const handleToggleFavorite = () => {
     if (!params.slug || typeof window === 'undefined') return
-    
-    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]')
+
+    const favorites = readFavorites()
     const slug = params.slug as string
     
     if (isFavorite) {
@@ -175,6 +191,19 @@ export default function RestaurantDetailClient() {
     }
   }
 
+  // Clipboard access can be unavailable (insecure context) or denied;
+  // surface a toast instead of leaving the promise rejection unhandled
+  const copyCurrentUrl = async (): Promise<boolean> => {
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable')
+      await navigator.clipboard.writeText(window.location.href)
+      return true
+    } catch {
+      toast.error('Could not copy the link — please copy it from the address bar')
+      return false
+    }
+  }
+
   const handleShareRestaurant = async () => {
     if (navigator.share && restaurant) {
       try {
@@ -187,18 +216,17 @@ export default function RestaurantDetailClient() {
       } catch (err) {
         // User cancelled or error occurred
       }
-    } else {
-      // Fallback: copy to clipboard
-      await navigator.clipboard.writeText(window.location.href)
+    } else if (await copyCurrentUrl()) {
       toast.success('Link copied to clipboard!')
       window.dispatchEvent(new CustomEvent('ekaty:share'))
     }
   }
 
   const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(window.location.href)
-    toast.success('Link copied to clipboard!')
-    window.dispatchEvent(new CustomEvent('ekaty:share'))
+    if (await copyCurrentUrl()) {
+      toast.success('Link copied to clipboard!')
+      window.dispatchEvent(new CustomEvent('ekaty:share'))
+    }
   }
 
   const getPriceLevelDisplay = (level: string) => {
@@ -276,14 +304,14 @@ export default function RestaurantDetailClient() {
     <div className="min-h-screen bg-gray-50">
       {/* Hero Image */}
       <div className="relative h-96 bg-gray-200">
-        {heroImage ? (
-          <img 
+        {heroImage && !heroImageFailed ? (
+          <img
             src={heroImage}
             alt={restaurant.name}
             className="w-full h-full object-cover"
-            onError={(e) => {
+            onError={() => {
               console.error('Hero image failed to load:', heroImage)
-              e.currentTarget.style.display = 'none'
+              setHeroImageFailed(true)
             }}
           />
         ) : (
@@ -399,7 +427,7 @@ export default function RestaurantDetailClient() {
                 ).map((cat: string) => (
                   <Link
                     key={cat}
-                    href={`/discover?category=${cat}`}
+                    href={`/discover?category=${encodeURIComponent(cat)}`}
                     className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm hover:bg-primary-100 hover:text-primary-700 transition-colors"
                   >
                     {cat}
@@ -573,8 +601,8 @@ export default function RestaurantDetailClient() {
                     name: restaurant.name,
                     cuisine: restaurant.primaryCategory || restaurant.cuisine,
                     address: restaurant.address,
-                    rating: restaurant.averageRating,
-                    imageUrl: restaurant.heroImageUrl || restaurant.imageUrl
+                    rating: restaurant.rating,
+                    imageUrl: heroImage || restaurant.logoUrl
                   }}
                 />
               </div>

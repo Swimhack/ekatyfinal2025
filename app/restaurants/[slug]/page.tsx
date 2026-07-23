@@ -12,13 +12,12 @@ import RestaurantDetailClient from './RestaurantDetailClient'
 // Re-render at most hourly so profile edits and watchdog updates surface
 export const revalidate = 3600
 
+// A database failure must not masquerade as a missing restaurant — that
+// would serve "Not Found" metadata with noindex for a real profile during
+// a transient outage. Let the error propagate so the request fails instead
+// (with ISR, a previously rendered page keeps being served).
 async function getRestaurant(slug: string) {
-  try {
-    return await prisma.restaurant.findFirst({ where: { slug } })
-  } catch (error) {
-    console.error('SEO: failed to load restaurant for metadata:', error)
-    return null
-  }
+  return prisma.restaurant.findFirst({ where: { slug } })
 }
 
 export async function generateMetadata({
