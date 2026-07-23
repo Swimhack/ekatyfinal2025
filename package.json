@@ -23,6 +23,7 @@
     "import:google": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/import-google-places.ts",
     "import:test": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/test-google-api.ts",
     "sync-restaurants": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/sync-restaurants.ts",
+    "watchdog:freshness": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/run-freshness-watchdog.ts",
     "update:all-listings": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/update-all-listings.ts",
     "generate:blog-seed": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/generate-blog-seed-articles.ts",
     "update:grub-roulette-article": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/update-grub-roulette-article.ts",

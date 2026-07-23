@@ -1,4 +1,5 @@
 import { MetadataRoute } from 'next'
+import { CATEGORY_META } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 3600 // Revalidate every hour
@@ -58,10 +59,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ]
 
-  // Category pages
-  const categories = ['Mexican', 'BBQ', 'Asian', 'American', 'Seafood', 'Indian', 'Greek', 'Breakfast', 'Italian', 'Chinese', 'Japanese', 'Thai', 'Vietnamese']
-  const categoryPages = categories.map(cat => ({
-    url: `${baseUrl}/discover?category=${encodeURIComponent(cat)}`,
+  // Category pages (canonical /categories/[slug] routes)
+  const categoryPages = CATEGORY_META.map(cat => ({
+    url: `${baseUrl}/categories/${cat.slug}`,
     lastModified: new Date(),
     changeFrequency: 'daily' as const,
     priority: 0.8,
