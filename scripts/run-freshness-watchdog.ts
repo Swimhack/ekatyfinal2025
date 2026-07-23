@@ -10,7 +10,8 @@ import { runFreshnessWatchdog } from '../lib/cron/freshness-watchdog'
 
 async function main() {
   const limitArg = process.argv[2]
-  const limit = limitArg ? parseInt(limitArg, 10) : undefined
+  const parsed = limitArg ? parseInt(limitArg, 10) : NaN
+  const limit = Number.isNaN(parsed) ? undefined : parsed
 
   const summary = await runFreshnessWatchdog(limit)
   console.log('\nSummary:', JSON.stringify(summary, null, 2))

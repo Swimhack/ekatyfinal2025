@@ -40,6 +40,16 @@ export interface WatchdogSummary {
   failed: number
 }
 
+function safeParseJson(value?: string | null): Record<string, any> {
+  if (!value) return {}
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
 function mergeMetadata(existing: string | null, patch: Record<string, any>): string {
   let base: Record<string, any> = {}
   try {
@@ -83,9 +93,11 @@ export async function runFreshnessWatchdog(limit: number = BATCH_SIZE): Promise<
 
   const staleCutoff = new Date(Date.now() - STALE_AFTER_DAYS * 24 * 60 * 60 * 1000)
 
+  // Inactive rows stay in the rotation so a temporary closure (or a bad
+  // deactivation) self-heals: when Google reports the place OPERATIONAL
+  // again, the update below reactivates it.
   const candidates = await prisma.restaurant.findMany({
     where: {
-      active: true,
       OR: [{ lastVerified: null }, { lastVerified: { lt: staleCutoff } }],
     },
     orderBy: { lastVerified: { sort: 'asc', nulls: 'first' } },
@@ -93,7 +105,7 @@ export async function runFreshnessWatchdog(limit: number = BATCH_SIZE): Promise<
   })
 
   if (candidates.length === 0) {
-    console.log('✅ Watchdog: all active restaurant profiles are fresh')
+    console.log('✅ Watchdog: all restaurant profiles are fresh')
     return summary
   }
 
@@ -146,12 +158,14 @@ export async function runFreshnessWatchdog(limit: number = BATCH_SIZE): Promise<
               }),
             },
           })
-          await auditWatchdogAction(restaurant.id, 'UPDATE', {
-            active: { from: true, to: false },
-            reason: 'google_place_not_found',
-          })
-          summary.deactivated++
-          console.log(`🚫 Deactivated (removed from Google): ${restaurant.name}`)
+          if (restaurant.active) {
+            await auditWatchdogAction(restaurant.id, 'UPDATE', {
+              active: { from: true, to: false },
+              reason: 'google_place_not_found',
+            })
+            summary.deactivated++
+            console.log(`🚫 Deactivated (removed from Google): ${restaurant.name}`)
+          }
           continue
         }
         throw error
@@ -160,6 +174,10 @@ export async function runFreshnessWatchdog(limit: number = BATCH_SIZE): Promise<
       const fresh = transformGooglePlaceToRestaurant(details)
 
       if (!fresh.active) {
+        // Both CLOSED_TEMPORARILY and CLOSED_PERMANENTLY come off the
+        // directory, but the precise status is recorded and inactive rows
+        // stay in the re-check rotation, so temporary closures reactivate
+        // automatically once Google reports OPERATIONAL again.
         await prisma.restaurant.update({
           where: { id: restaurant.id },
           data: {
@@ -168,27 +186,37 @@ export async function runFreshnessWatchdog(limit: number = BATCH_SIZE): Promise<
             lastVerified: new Date(),
             metadata: mergeMetadata(restaurant.metadata, {
               watchdog: {
-                status: 'closed',
+                status:
+                  details.business_status === 'CLOSED_TEMPORARILY'
+                    ? 'temporarily_closed'
+                    : 'closed',
                 businessStatus: details.business_status,
                 checkedAt: new Date().toISOString(),
               },
             }),
           },
         })
-        await auditWatchdogAction(restaurant.id, 'UPDATE', {
-          active: { from: true, to: false },
-          reason: details.business_status,
-        })
-        summary.deactivated++
-        console.log(`🚫 Deactivated (${details.business_status}): ${restaurant.name}`)
+        if (restaurant.active) {
+          await auditWatchdogAction(restaurant.id, 'UPDATE', {
+            active: { from: true, to: false },
+            reason: details.business_status,
+          })
+          summary.deactivated++
+          console.log(`🚫 Deactivated (${details.business_status}): ${restaurant.name}`)
+        }
         continue
       }
 
-      // Override-safe update: same lock semantics as the importer
+      // Override-safe update: same lock semantics as the importer.
+      // metadata is merged rather than replaced so watchdog history and
+      // app/admin-stored fields survive Google refreshes.
       const overrides = restaurant.adminOverrides ? JSON.parse(restaurant.adminOverrides) : {}
       const safeUpdate = Object.keys(fresh).reduce((acc: any, key) => {
         if (!overrides[key]) {
-          acc[key] = (fresh as any)[key]
+          acc[key] =
+            key === 'metadata'
+              ? mergeMetadata(restaurant.metadata, safeParseJson((fresh as any).metadata))
+              : (fresh as any)[key]
         }
         return acc
       }, {})
@@ -203,6 +231,13 @@ export async function runFreshnessWatchdog(limit: number = BATCH_SIZE): Promise<
           lastVerified: new Date(),
         },
       })
+      if (!restaurant.active && safeUpdate.active) {
+        await auditWatchdogAction(restaurant.id, 'UPDATE', {
+          active: { from: false, to: true },
+          reason: 'operational_again',
+        })
+        console.log(`✅ Reactivated (OPERATIONAL again): ${restaurant.name}`)
+      }
       summary.updated++
     } catch (error) {
       summary.failed++

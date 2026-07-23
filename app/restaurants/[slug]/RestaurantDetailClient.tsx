@@ -211,11 +211,23 @@ export default function RestaurantDetailClient() {
     }
   }
 
-  const formatHours = (hours: any) => {
+  // Normalizes both stored hours shapes to a display string:
+  // Google-imported "11:00 AM – 10:00 PM" / "Closed" strings, and
+  // seeded { open, close } / { closed: true } objects
+  const formatHours = (hours: any): string | null => {
     if (!hours) return null
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
     const today = days[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]
-    return hours[today]
+    const value = hours[today]
+    if (!value) return null
+    if (typeof value === 'string') {
+      return /not available/i.test(value) ? null : value
+    }
+    if (typeof value === 'object') {
+      if (value.closed) return 'Closed'
+      if (value.open && value.close) return `${value.open} - ${value.close}`
+    }
+    return null
   }
 
   if (loading) {
@@ -525,7 +537,7 @@ export default function RestaurantDetailClient() {
                 <div className="mb-4">
                   <h3 className="text-sm font-medium text-gray-600 mb-1">Today&apos;s Hours</h3>
                   <p className="text-gray-900">
-                    {todayHours.open} - {todayHours.close}
+                    {todayHours}
                   </p>
                 </div>
               )}

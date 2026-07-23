@@ -5,7 +5,7 @@ import Link from 'next/link'
 import ConditionalNav from '@/components/ConditionalNav'
 import ClientProviders from '@/components/ClientProviders'
 import ShareRewardsTracker from '@/components/ShareRewardsTracker'
-import { SITE_URL, KATY_GEO } from '@/lib/seo'
+import { SITE_URL, KATY_GEO, serializeJsonLd } from '@/lib/seo'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -105,11 +105,11 @@ export default function RootLayout({
       <body className={`${inter.className} bg-gray-50`}>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationJsonLd) }}
         />
         {/* Skip to main content link for accessibility */}
         <a

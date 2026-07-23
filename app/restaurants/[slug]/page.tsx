@@ -5,6 +5,7 @@ import {
   restaurantJsonLd,
   breadcrumbJsonLd,
   priceRangeSymbol,
+  serializeJsonLd,
 } from '@/lib/seo'
 import RestaurantDetailClient from './RestaurantDetailClient'
 
@@ -92,13 +93,13 @@ export default async function RestaurantDetailPage({
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
-              __html: JSON.stringify(restaurantJsonLd(restaurant)),
+              __html: serializeJsonLd(restaurantJsonLd(restaurant)),
             }}
           />
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
-              __html: JSON.stringify(
+              __html: serializeJsonLd(
                 breadcrumbJsonLd([
                   { name: 'Home', url: SITE_URL },
                   { name: 'Restaurants', url: `${SITE_URL}/discover` },

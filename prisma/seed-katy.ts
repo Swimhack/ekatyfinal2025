@@ -98,7 +98,9 @@ async function seedRestaurants() {
       // import/watchdog, and the UI has a graceful no-photo fallback
       photos: restaurant.image || '',
       logoUrl: restaurant.image || null,
-      featured: (restaurant.rating ?? 0) >= 4.5,
+      // Featured is an explicit editorial flag in the seed data (no longer
+      // derived from ratings, which were removed as unverified)
+      featured: restaurant.featured === true,
       verified: true,
       active: true,
       rating: restaurant.rating ?? null,

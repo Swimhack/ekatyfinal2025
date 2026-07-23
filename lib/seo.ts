@@ -37,6 +37,19 @@ export const CATEGORY_META: CategoryMeta[] = [
   { name: 'Desserts', slug: 'desserts', emoji: '🍰', description: 'Sweet treats and dessert spots' },
 ]
 
+/**
+ * Serialize a JSON-LD object for injection into a <script> tag.
+ * JSON.stringify does not escape <, >, or &, so an untrusted value like a
+ * restaurant name containing "</script>" could terminate the script element
+ * (stored XSS). Escaping them as Unicode sequences keeps the JSON valid.
+ */
+export function serializeJsonLd(data: Record<string, any>): string {
+  return JSON.stringify(data)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+}
+
 export function priceRangeSymbol(priceLevel?: string | null): string {
   switch (priceLevel) {
     case 'BUDGET':

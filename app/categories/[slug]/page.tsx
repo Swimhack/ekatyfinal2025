@@ -5,6 +5,7 @@ import {
   CATEGORY_META,
   breadcrumbJsonLd,
   restaurantItemListJsonLd,
+  serializeJsonLd,
 } from '@/lib/seo'
 import { matchesCategory } from '@/lib/search'
 import CategoryClient from './CategoryClient'
@@ -88,7 +89,7 @@ export default async function CategoryPage({
             <script
               type="application/ld+json"
               dangerouslySetInnerHTML={{
-                __html: JSON.stringify(
+                __html: serializeJsonLd(
                   restaurantItemListJsonLd(
                     restaurants,
                     `Best ${category.name} Restaurants in Katy, TX`
@@ -100,7 +101,7 @@ export default async function CategoryPage({
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
-              __html: JSON.stringify(
+              __html: serializeJsonLd(
                 breadcrumbJsonLd([
                   { name: 'Home', url: SITE_URL },
                   { name: 'Categories', url: `${SITE_URL}/categories` },
