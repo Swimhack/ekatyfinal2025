@@ -112,6 +112,33 @@ const BRAND_MARKETING_HINTS = [
  */
 const NATIONAL_BRAND_HOSTS = ['starbucks.com', 'mcdonalds.com', 'portillos.com']
 
+/**
+ * Storage we control: admin and owner uploads, plus static assets shipped with
+ * the site. Observed in production as `/uploads/restaurants/<id>/photo-*.jpg`,
+ * `/images/harlem_road_bbq.jpg` and the R2 bucket.
+ *
+ * These skip the filename heuristics below. Those exist to catch imagery
+ * scraped from third-party sites, and guessing from a filename is the wrong
+ * tool for a file a human deliberately uploaded against a listing — an owner
+ * whose photo happens to be called social-share.jpg should still get their
+ * photo. It cannot weaken the brand rules, because a chain's corporate domain
+ * is not somewhere we can upload to.
+ */
+const FIRST_PARTY_IMAGE_HOSTS = ['ekaty.com', 'r2.dev', 'r2.cloudflarestorage.com']
+
+export function isFirstPartyImageUrl(url: string): boolean {
+  const trimmed = (url || '').trim()
+  if (!trimmed) return false
+  // Served from our own origin.
+  if (trimmed.startsWith('/')) return true
+  try {
+    const host = new URL(trimmed).hostname.toLowerCase().replace(/^www\./, '')
+    return FIRST_PARTY_IMAGE_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))
+  } catch {
+    return false
+  }
+}
+
 export function isStockPhotoUrl(url: string): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase()
@@ -169,11 +196,15 @@ export function assessPhotoUrl(url: string): PhotoAssessment {
   if (trimmed.includes('picsum.photos')) {
     return { url: trimmed, ok: false, reason: 'stock_picsum' }
   }
-  if (isLogoOrFaviconUrl(trimmed)) {
-    return { url: trimmed, ok: false, reason: 'logo_or_favicon' }
-  }
-  if (isBrandMarketingImageUrl(trimmed)) {
-    return { url: trimmed, ok: false, reason: 'brand_marketing' }
+  // An upload is a deliberate editorial choice; the filename guesses below are
+  // for scraped third-party imagery and would only second-guess it.
+  if (!isFirstPartyImageUrl(trimmed)) {
+    if (isLogoOrFaviconUrl(trimmed)) {
+      return { url: trimmed, ok: false, reason: 'logo_or_favicon' }
+    }
+    if (isBrandMarketingImageUrl(trimmed)) {
+      return { url: trimmed, ok: false, reason: 'brand_marketing' }
+    }
   }
 
   try {
@@ -197,12 +228,20 @@ export function pickDisplayPhoto(
     photos?: unknown
     displayPhoto?: string | null
     heroImage?: string | null
+    profileImageUrl?: string | null
+    heroImageUrl?: string | null
     logoUrl?: string | null
   }
 ): string | null {
   const candidates = [
     restaurant.displayPhoto,
+    // An admin or owner set these deliberately, so they outrank anything an
+    // importer chose. The field has moved around — 795 rows carry
+    // metadata.profileImageUrl while the admin hero save writes heroImage — so
+    // all the spellings are read rather than assuming one won.
     restaurant.heroImage,
+    restaurant.heroImageUrl,
+    restaurant.profileImageUrl,
     ...filterDisplayPhotos(restaurant.photos),
     // logoUrl is intentionally last and still policy-checked
     restaurant.logoUrl,

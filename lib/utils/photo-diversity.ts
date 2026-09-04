@@ -23,6 +23,8 @@ export type PhotoRestaurant = {
   name?: string
   photos?: string | string[] | null
   heroImage?: string | null
+  heroImageUrl?: string | null
+  profileImageUrl?: string | null
   logoUrl?: string | null
   categories?: any
   cuisineTypes?: any
@@ -53,7 +55,13 @@ export function diversifyAdjacentPhotos<T extends PhotoRestaurant>(
   const recent: string[] = []
 
   return restaurants.map((r) => {
-    const own = [r.heroImage, ...parsePhotos(r.photos), r.logoUrl]
+    const own = [
+      r.heroImage,
+      r.heroImageUrl,
+      r.profileImageUrl,
+      ...parsePhotos(r.photos),
+      r.logoUrl,
+    ]
       .filter(Boolean)
       .filter((url) => assessPhotoUrl(String(url)).ok) as string[]
     const avoided = new Set(recent)

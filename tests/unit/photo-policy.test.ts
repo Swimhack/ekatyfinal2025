@@ -2,6 +2,7 @@ import {
   assessPhotoUrl,
   filterDisplayPhotos,
   isBrandMarketingImageUrl,
+  isFirstPartyImageUrl,
   pickDisplayPhoto,
 } from '../../lib/photos/photo-policy'
 
@@ -107,6 +108,33 @@ describe('brand marketing imagery', () => {
   })
 })
 
+describe('own uploads are never second-guessed', () => {
+  it('accepts the upload and static paths production actually stores', () => {
+    const uploads = [
+      '/uploads/restaurants/cmlsq71pt0023dtyc184lpix3/photo-1788536112938-f08db8d2.jpg',
+      '/images/harlem_road_bbq.jpg',
+      'https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/716b1eb7/hero.png',
+    ]
+    for (const url of uploads) {
+      expect(isFirstPartyImageUrl(url)).toBe(true)
+      expect(assessPhotoUrl(url).ok).toBe(true)
+    }
+  })
+
+  it('does not judge an upload by its filename', () => {
+    // An owner's own photograph can be called anything. The filename rules are
+    // for scraped third-party imagery, not for a file someone uploaded here.
+    expect(assessPhotoUrl('/uploads/restaurants/abc/social-share.jpg').ok).toBe(true)
+    expect(assessPhotoUrl('/uploads/restaurants/abc/og-image.png').ok).toBe(true)
+    expect(assessPhotoUrl('/uploads/restaurants/abc/logo-front-door.jpg').ok).toBe(true)
+  })
+
+  it('still rejects the brand tile — a chain domain is not somewhere we upload', () => {
+    expect(isFirstPartyImageUrl(STARBUCKS_OG)).toBe(false)
+    expect(assessPhotoUrl(STARBUCKS_OG).reason).toBe('brand_marketing')
+  })
+})
+
 describe('display selection', () => {
   it('drops brand artwork from a photo list but keeps the real photo', () => {
     const real = 'https://a.mktgcdn.com/p/interior.jpg'
@@ -122,6 +150,28 @@ describe('display selection', () => {
     // The Grub Roulette reveal hands over a string[] from a naive split, so the
     // guard has to hold for that shape too, not just the raw column.
     expect(filterDisplayPhotos([STARBUCKS_OG])).toEqual([])
+  })
+
+  it('lets an uploaded primary beat the imported photos', () => {
+    const upload = '/uploads/restaurants/abc/photo-1.jpg'
+    const imported = 'https://a.mktgcdn.com/p/imported.jpg'
+    // Whichever field the upload landed in, it wins.
+    expect(pickDisplayPhoto({ heroImage: upload, photos: imported })).toBe(upload)
+    expect(pickDisplayPhoto({ profileImageUrl: upload, photos: imported })).toBe(upload)
+    expect(pickDisplayPhoto({ heroImageUrl: upload, photos: imported })).toBe(upload)
+  })
+
+  it('falls through to an imported photo when the uploaded field is empty', () => {
+    const imported = 'https://a.mktgcdn.com/p/imported.jpg'
+    expect(
+      pickDisplayPhoto({ heroImage: null, profileImageUrl: null, photos: imported })
+    ).toBe(imported)
+  })
+
+  it('will not let a brand tile in through the uploaded fields either', () => {
+    expect(
+      pickDisplayPhoto({ heroImage: STARBUCKS_OG, profileImageUrl: STARBUCKS_OG })
+    ).toBeNull()
   })
 
   it('will not fall back to a brand logo in logoUrl', () => {
