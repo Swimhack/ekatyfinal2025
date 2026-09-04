@@ -118,6 +118,12 @@ describe('display selection', () => {
     expect(pickDisplayPhoto({ photos: `${STARBUCKS_OG},${real}` })).toBe(real)
   })
 
+  it('rejects a brand tile arriving as an already-split array', () => {
+    // The Grub Roulette reveal hands over a string[] from a naive split, so the
+    // guard has to hold for that shape too, not just the raw column.
+    expect(filterDisplayPhotos([STARBUCKS_OG])).toEqual([])
+  })
+
   it('will not fall back to a brand logo in logoUrl', () => {
     expect(
       pickDisplayPhoto({ photos: '', logoUrl: 'https://example.com/logos/brand.png' })
