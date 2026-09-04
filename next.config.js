@@ -16,8 +16,10 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      // Hero image uploads allow up to 5MB, so the request body limit has to match.
-      bodySizeLimit: '5mb',
+      // Hero uploads cap at 5MB in the route handler; the framework limit is
+      // set higher so multipart overhead can never be what rejects a valid file.
+      // Reverse proxies need a matching client_max_body_size.
+      bodySizeLimit: '10mb',
     },
     instrumentationHook: true,
   },

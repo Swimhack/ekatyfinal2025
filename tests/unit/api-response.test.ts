@@ -1,17 +1,34 @@
 import {
   httpErrorMessage,
+  looksLikeHtml,
   parseJsonResponse,
   summarizeResponseBody,
 } from '../../lib/utils/api-response'
 
-function makeResponse(body: string, init: { status?: number; ok?: boolean } = {}): Response {
+const NGINX_413 =
+  '<html>\r\n<head><title>413 Request Entity Too Large</title></head>\r\n<body>\r\n<center><h1>413 Request Entity Too Large</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>'
+
+function makeResponse(
+  body: string,
+  init: { status?: number; ok?: boolean; contentType?: string } = {}
+): Response {
   const status = init.status ?? 200
   return {
     ok: init.ok ?? (status >= 200 && status < 300),
     status,
+    headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? init.contentType ?? null : null) },
     text: async () => body,
   } as unknown as Response
 }
+
+describe('looksLikeHtml', () => {
+  it('detects markup bodies and html content types', () => {
+    expect(looksLikeHtml(NGINX_413)).toBe(true)
+    expect(looksLikeHtml('<!DOCTYPE html><html></html>')).toBe(true)
+    expect(looksLikeHtml('{"error":"nope"}')).toBe(false)
+    expect(looksLikeHtml('anything', 'text/html; charset=utf-8')).toBe(true)
+  })
+})
 
 describe('summarizeResponseBody', () => {
   it('strips HTML markup and collapses whitespace', () => {
@@ -32,13 +49,22 @@ describe('httpErrorMessage', () => {
   it('explains auth, size and configuration failures', () => {
     expect(httpErrorMessage(401, null)).toMatch(/sign in again/i)
     expect(httpErrorMessage(413, null)).toMatch(/too large/i)
+    expect(httpErrorMessage(404, null)).toMatch(/no endpoint/i)
     expect(httpErrorMessage(501, null)).toMatch(/not configured/i)
     expect(httpErrorMessage(502, null)).toMatch(/unavailable/i)
   })
 
-  it('falls back to a sanitized body snippet', () => {
-    expect(httpErrorMessage(500, null, '<html><body>Boom</body></html>', 'Upload failed')).toBe(
-      'Upload failed (HTTP 500): Boom'
+  it('describes an HTML error page instead of quoting markup', () => {
+    const message = httpErrorMessage(500, null, NGINX_413, 'Failed to upload hero image')
+
+    expect(message).toMatch(/error page/i)
+    expect(message).toMatch(/under 5MB/i)
+    expect(message).not.toContain('<')
+  })
+
+  it('falls back to a sanitized body snippet for non-HTML bodies', () => {
+    expect(httpErrorMessage(500, null, 'Boom: disk is full', 'Upload failed')).toBe(
+      'Upload failed (HTTP 500): Boom: disk is full'
     )
   })
 })
@@ -73,11 +99,35 @@ describe('parseJsonResponse', () => {
     expect(parsed.error).toBe('File size must be less than 5MB')
   })
 
-  it('flags a 200 response that is not JSON', async () => {
-    const parsed = await parseJsonResponse(makeResponse('<!DOCTYPE html><p>login</p>'))
+  it('flags a 200 response that is neither JSON nor HTML', async () => {
+    const parsed = await parseJsonResponse(makeResponse('OK'))
 
     expect(parsed.ok).toBe(false)
     expect(parsed.error).toMatch(/non-JSON/i)
+  })
+
+  it('turns an nginx 413 HTML page into an upload-size message', async () => {
+    const parsed = await parseJsonResponse(
+      makeResponse(NGINX_413, { status: 413, contentType: 'text/html' }),
+      'Failed to upload hero image'
+    )
+
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toMatch(/upload too large/i)
+    expect(parsed.error).not.toContain('<')
+  })
+
+  it('does not report an HTML 200 body as data', async () => {
+    const parsed = await parseJsonResponse(
+      makeResponse('<!DOCTYPE html><html><body>sign in</body></html>', {
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+      })
+    )
+
+    expect(parsed.ok).toBe(false)
+    expect(parsed.data).toBeNull()
+    expect(parsed.error).toMatch(/web page instead of data/i)
   })
 
   it('handles an empty body without throwing', async () => {
