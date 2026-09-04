@@ -67,7 +67,7 @@ function PickPhoto({ pick }: { pick: AskPick }) {
   const photo = failed ? null : pick.imageUrl
 
   return (
-    <div className="h-20 w-20 flex-none overflow-hidden rounded-lg bg-gray-100 sm:h-24 sm:w-24">
+    <div className="h-20 w-20 overflow-hidden rounded-lg bg-gray-100 sm:h-24 sm:w-24">
       {photo ? (
         <img
           src={photo}
@@ -113,13 +113,17 @@ function PickCard({
   return (
     <div className="card p-5 sm:p-6">
       <div className="flex items-start gap-4">
-        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-primary-600 font-bold text-white">
-          {position}
+        {/* The rank sits on the photo's corner rather than beside it: on a phone
+            a badge, a thumbnail and a restaurant name in a row leaves the name
+            wrapping over three lines. */}
+        <div className="relative flex-none">
+          <Link href={pick.url} onClick={trackClick} aria-label={pick.name} tabIndex={-1}>
+            <PickPhoto pick={pick} />
+          </Link>
+          <span className="absolute -left-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 font-bold text-white ring-2 ring-white">
+            {position}
+          </span>
         </div>
-
-        <Link href={pick.url} onClick={trackClick} aria-label={pick.name} tabIndex={-1}>
-          <PickPhoto pick={pick} />
-        </Link>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
