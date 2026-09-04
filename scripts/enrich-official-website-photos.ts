@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { parsePhotos, serializePhotos } from '../lib/photos/parse-photos'
 import {
+  assessPhotoUrl,
   readPhotoRights,
   writePhotoRights,
   type PhotoRightsRecord,
@@ -67,7 +68,19 @@ async function discoverOfficialImage(row: {
     const imageUrl = new URL(decodeHtml(rawImage), page.url)
     if (imageUrl.protocol === 'http:') imageUrl.protocol = 'https:'
     const image = imageUrl.toString()
-    if (/favicon|apple-touch|\/logo[./_-]|dummy|placeholder/i.test(image)) {
+    if (/dummy|placeholder/i.test(image)) {
+      return null
+    }
+    /**
+     * og:image is very often the brand's social card rather than a photograph
+     * of the place. Scraping it is how every Starbucks row ended up holding
+     * starbucks.com/weblx/images/social/summary_square.png.
+     *
+     * Deferring to the display policy means this script cannot store anything
+     * the listing pages would refuse to show, so a cleanup stays clean.
+     */
+    const assessment = assessPhotoUrl(image)
+    if (!assessment.ok) {
       return null
     }
 

@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { serializePhotos } from '../lib/photos/parse-photos'
 import {
+  assessPhotoUrl,
   readPhotoRights,
   writePhotoRights,
   type PhotoRightsRecord,
@@ -172,7 +173,10 @@ function baseScore(candidate: RawCandidate): number {
   const text = `${candidate.url} ${candidate.context}`
   if (
     NEGATIVE.test(text) ||
-    REJECTED_URL_PARTS.some((part) => candidate.url.includes(part))
+    REJECTED_URL_PARTS.some((part) => candidate.url.includes(part)) ||
+    // Anything the listing pages would refuse to display is not worth storing,
+    // however well the surrounding page text scores.
+    !assessPhotoUrl(candidate.url).ok
   ) {
     return -200
   }
