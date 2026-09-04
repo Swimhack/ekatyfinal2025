@@ -81,6 +81,10 @@ function SpinnerPageContent() {
   const [maxSegments, setMaxSegments] = useState(WHEEL_SEGMENTS)
 
   const [isSpinning, setIsSpinning] = useState(false)
+  /** Held from the click until the wheel settles, so one click is one draw. */
+  const spinLock = useRef(false)
+  /** True only while the winner is being drawn, before the wheel starts moving. */
+  const [drawPending, setDrawPending] = useState(false)
   const [targetIndex, setTargetIndex] = useState<number | null>(null)
   const [pendingWinner, setPendingWinner] = useState<SpinnerRestaurant | null>(null)
   const [result, setResult] = useState<SpinnerRestaurant | null>(null)
@@ -246,7 +250,7 @@ function SpinnerPageContent() {
     })
   }, [favoritesOnly, favorites, excludedIds, selectedCuisines, similarTerms, moodTerms, priceLevels])
 
-  const loadPool = useCallback(async () => {
+  const loadPool = useCallback(async (signal?: AbortSignal) => {
     // Legacy "Spin Similar" links have to resolve their cuisine first, otherwise
     // the wheel would flash an unfiltered directory draw.
     if (seedPending) {
@@ -276,7 +280,7 @@ function SpinnerPageContent() {
     params.set('limit', '40')
 
     try {
-      const response = await fetch(`/api/spin?${params.toString()}`)
+      const response = await fetch(`/api/spin?${params.toString()}`, { signal })
       if (!response.ok) throw new Error('Failed to load restaurants')
 
       const data = await response.json()
@@ -284,8 +288,12 @@ function SpinnerPageContent() {
 
       // A listing whose cuisine has no peers left would leave the wheel empty,
       // which is a dead end the user did not ask for. Widen to the directory and
-      // say so — but never override a filter the user chose themselves.
-      if (total === 0 && seedOwnsFilters.current) {
+      // say so — but only when the seed is the only thing narrowing the pool, so
+      // a mood or budget the user chose is never silently overridden.
+      const seedIsSoleFilter =
+        seedOwnsFilters.current && activeMoods.length === 0 && !selectedPriceLevel
+
+      if (total === 0 && seedIsSoleFilter) {
         seedOwnsFilters.current = false
         setSelectedCuisines([])
         setSimilarTerms([])
@@ -296,12 +304,16 @@ function SpinnerPageContent() {
       setPool(data.restaurants || [])
       setPoolTotal(total)
       setError(null)
-    } catch {
+    } catch (loadError: any) {
+      // A superseded request must not clear the pool or raise an error banner
+      // for the filters the user is actually looking at now.
+      if (signal?.aborted || loadError?.name === 'AbortError') return
+
       setPool([])
       setPoolTotal(0)
       setError('We could not reach the eKaty directory. Try again in a moment.')
     } finally {
-      setPoolLoading(false)
+      if (!signal?.aborted) setPoolLoading(false)
     }
   }, [
     seedPending,
@@ -310,14 +322,20 @@ function SpinnerPageContent() {
     cuisineQueryTerms,
     moodTerms,
     priceLevels,
+    activeMoods,
+    selectedPriceLevel,
     excludedIds,
     nearMeActive,
     coords,
     radius,
   ])
 
+  // Each filter change supersedes the last: abort the previous request so a slow
+  // older response can never overwrite the newer one's results.
   useEffect(() => {
-    void loadPool()
+    const controller = new AbortController()
+    void loadPool(controller.signal)
+    return () => controller.abort()
   }, [loadPool])
 
   // Repaint the wedges whenever the pool changes, but never mid-spin and never
@@ -413,13 +431,24 @@ function SpinnerPageContent() {
     setError(null)
   }
 
+  const releaseSpinLock = useCallback(() => {
+    spinLock.current = false
+    setDrawPending(false)
+  }, [])
+
   const handleSpin = useCallback(async () => {
-    if (isSpinning) return
+    // The lock is a ref because `isSpinning` only goes true once the winner POST
+    // has resolved: a second click before then would otherwise start a second
+    // draw, and the loser of that race would be charged a spin nobody sees.
+    if (spinLock.current || isSpinning) return
 
     if (segments.length < 2) {
       setError('Not enough restaurants match that mood. Loosen a filter and try again.')
       return
     }
+
+    spinLock.current = true
+    setDrawPending(true)
 
     setError(null)
     setResult(null)
@@ -457,12 +486,14 @@ function SpinnerPageContent() {
         winner = data.restaurant
       } catch (spinError: any) {
         setError(spinError?.message || 'Something went wrong. Try spinning again.')
+        releaseSpinLock()
         return
       }
     }
 
     if (!winner) {
       setError('The wheel came up empty. Try again.')
+      releaseSpinLock()
       return
     }
 
@@ -473,6 +504,7 @@ function SpinnerPageContent() {
       setResult(winner)
       setHistory(current => [winner!, ...current].slice(0, 6))
       setSpinCount(count => count + 1)
+      releaseSpinLock()
       return
     }
 
@@ -480,9 +512,13 @@ function SpinnerPageContent() {
 
     setPendingWinner(winner)
     setTargetIndex(index)
+    // `isSpinning` takes over keeping the CTA disabled from here; the lock stays
+    // held until the wheel settles.
+    setDrawPending(false)
     setIsSpinning(true)
   }, [
     isSpinning,
+    releaseSpinLock,
     segments,
     favoritesOnly,
     excludedIds,
@@ -498,6 +534,7 @@ function SpinnerPageContent() {
 
   const handleSettled = useCallback(() => {
     setIsSpinning(false)
+    releaseSpinLock()
 
     const winner = pendingWinner
     setPendingWinner(null)
@@ -513,7 +550,7 @@ function SpinnerPageContent() {
     }
 
     if (!prefersReducedMotion) fireConfetti()
-  }, [pendingWinner, soundEnabled, spinSound, winSound, prefersReducedMotion])
+  }, [pendingWinner, releaseSpinLock, soundEnabled, spinSound, winSound, prefersReducedMotion])
 
   const handleTick = useCallback(() => {
     if (soundEnabled) playTick()
@@ -544,6 +581,11 @@ function SpinnerPageContent() {
 
   // Once the user clears the seed there is nothing left to explain.
   const showSeedBanner = seededFromListing && Boolean(seedLabel || seedNote)
+
+  // Covers the draw as well as the animation, so the CTA is dead from the first
+  // click rather than from the moment the wheel starts moving.
+  const spinInProgress = isSpinning || drawPending
+  const spinDisabled = spinInProgress || segments.length < 2
 
   const poolSummary = poolLoading
     ? 'Shuffling the deck…'
@@ -663,14 +705,15 @@ function SpinnerPageContent() {
 
             <button
               onClick={handleSpin}
-              disabled={isSpinning || segments.length < 2}
+              disabled={spinDisabled}
+              aria-busy={spinInProgress}
               className={`mt-4 min-h-[60px] w-full max-w-sm rounded-2xl px-10 text-xl font-black uppercase tracking-wide transition-all ${
-                isSpinning || segments.length < 2
+                spinDisabled
                   ? 'cursor-not-allowed bg-charcoal-700/70 text-bone-100/40'
                   : 'bg-gradient-to-r from-primary-800 to-primary-600 text-bone-50 shadow-[0_12px_34px_-10px_rgba(153,27,27,0.85)] hover:brightness-110 active:scale-[0.98]'
-              } ${isSpinning || prefersReducedMotion || segments.length < 2 ? '' : 'animate-spin-cta-pulse'}`}
+              } ${spinDisabled || prefersReducedMotion ? '' : 'animate-spin-cta-pulse'}`}
             >
-              {isSpinning ? 'Spinning…' : result ? 'Spin again' : 'Spin the wheel'}
+              {spinInProgress ? 'Spinning…' : result ? 'Spin again' : 'Spin the wheel'}
             </button>
 
             <p className="mt-3 text-center text-xs text-bone-100/45">
@@ -745,9 +788,12 @@ function SpinnerPageContent() {
                     {PRICE_LEVELS.map(level => (
                       <button
                         key={level.value}
-                        onClick={() =>
+                        onClick={() => {
+                          // The user is steering now, so an empty result is
+                          // theirs to see rather than something to widen away.
+                          seedOwnsFilters.current = false
                           setSelectedPriceLevel(current => (current === level.value ? null : level.value))
-                        }
+                        }}
                         disabled={isSpinning}
                         aria-pressed={selectedPriceLevel === level.value}
                         className={`min-h-[48px] rounded-lg text-center transition disabled:opacity-50 ${
@@ -775,7 +821,10 @@ function SpinnerPageContent() {
                       min={1}
                       max={20}
                       value={radius}
-                      onChange={event => setRadius(parseInt(event.target.value, 10))}
+                      onChange={event => {
+                        seedOwnsFilters.current = false
+                        setRadius(parseInt(event.target.value, 10))
+                      }}
                       disabled={isSpinning}
                       aria-label="Maximum distance in miles"
                       className="w-full accent-sage-500"

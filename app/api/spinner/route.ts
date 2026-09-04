@@ -51,7 +51,7 @@ async function readFilters(request: NextRequest): Promise<CandidateFilters> {
   }
 }
 
-async function spin(request: NextRequest) {
+async function spin(request: NextRequest, { record }: { record: boolean }) {
   try {
     const filters = await readFilters(request)
 
@@ -66,15 +66,17 @@ async function spin(request: NextRequest) {
 
     const restaurant = restaurants[Math.floor(Math.random() * restaurants.length)]
 
-    try {
-      await prisma.spin.create({
-        data: {
-          restaurantId: restaurant.id,
-          spinParams: JSON.stringify(filters),
-        },
-      })
-    } catch (error) {
-      console.error('Failed to record spin:', error)
+    if (record) {
+      try {
+        await prisma.spin.create({
+          data: {
+            restaurantId: restaurant.id,
+            spinParams: JSON.stringify(filters),
+          },
+        })
+      } catch (error) {
+        console.error('Failed to record spin:', error)
+      }
     }
 
     return NextResponse.json({
@@ -87,10 +89,16 @@ async function spin(request: NextRequest) {
   }
 }
 
+/**
+ * Read-only draw. This endpoint takes no authentication, so a GET must never
+ * insert a `spin` row: that would let anyone inflate the analytics table (and
+ * a restaurant's roulette counts) with a link or a prefetch. Recording belongs
+ * to POST, which is what the spinner UI uses.
+ */
 export async function GET(request: NextRequest) {
-  return spin(request)
+  return spin(request, { record: false })
 }
 
 export async function POST(request: NextRequest) {
-  return spin(request)
+  return spin(request, { record: true })
 }
