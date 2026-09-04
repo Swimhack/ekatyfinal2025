@@ -24,6 +24,7 @@ export { rankCandidates, applyHardFilters, scoreCandidate, zipCentroid, DEFAULT_
 export { buildChainIndex, isChain } from './chains'
 export { isOpenAt, katyLocalNow } from './hours'
 export { buildWhyLine } from './why'
+export { resolveCandidatePhoto } from './photo'
 
 import { buildWhyLine } from './why'
 
@@ -137,6 +138,7 @@ export function runAsk(
       zipCode: candidate.zipCode,
       rating: candidate.rating,
       reviewCount: candidate.reviewCount,
+      imageUrl: candidate.imageUrl,
       spin_similar_url: buildSpinSimilarUrl(cuisine, source),
     }
   })

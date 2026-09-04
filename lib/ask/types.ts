@@ -64,6 +64,11 @@ export interface AskCandidate {
   featured: boolean
   /** Raw `hours` JSON string, parsed lazily by lib/ask/hours.ts. */
   hours: string | null
+  /**
+   * A photo the listing already stores, chosen by lib/ask/photo.ts. Null when
+   * the row has none that clears the site photo policy.
+   */
+  imageUrl: string | null
 }
 
 export type MatchReasonKind =
@@ -116,6 +121,11 @@ export interface AskPick {
   /** Straight from the DB; null when we have no rating on file. */
   rating: number | null
   reviewCount: number
+  /**
+   * The listing's own stored photo, or null when it has none. Never a stock or
+   * brand-marketing image, so a null here means the UI shows a placeholder.
+   */
+  imageUrl: string | null
   /** Seeds the existing spinner with this pick's cuisine. */
   spin_similar_url: string | null
 }

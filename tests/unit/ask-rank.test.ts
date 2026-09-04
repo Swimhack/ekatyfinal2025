@@ -22,6 +22,7 @@ function candidate(overrides: Partial<AskCandidate> & { name: string }): AskCand
     reviewCount: 100,
     featured: false,
     hours: null,
+    imageUrl: null,
     ...overrides,
   }
 }
