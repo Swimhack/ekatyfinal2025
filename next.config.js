@@ -16,9 +16,20 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      // Hero image uploads allow up to 5MB, so the request body limit has to match.
+      bodySizeLimit: '5mb',
     },
     instrumentationHook: true,
+  },
+  async rewrites() {
+    return [
+      // Runs only when no static file matched: standalone builds can serve from a
+      // different public/ tree than the one an upload was written to.
+      {
+        source: '/uploads/:path*',
+        destination: '/api/uploads/:path*',
+      },
+    ]
   },
 }
 
