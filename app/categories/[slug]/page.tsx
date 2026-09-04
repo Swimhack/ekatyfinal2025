@@ -1,147 +1,152 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import type { Metadata } from 'next'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import RestaurantCard from '@/components/RestaurantCard'
+import { diversifyAdjacentPhotos } from '@/lib/utils/photo-diversity'
+import { searchRestaurants } from '@/lib/search/search-restaurants'
+import { RESTAURANT_CATEGORIES, THIN_CATEGORY_THRESHOLD, findCategory } from '@/lib/categories'
 
-const allCategories = [
-  { name: 'Mexican', slug: 'mexican', emoji: '🌮', description: 'Tacos, burritos, and authentic Mexican cuisine' },
-  { name: 'BBQ', slug: 'bbq', emoji: '🍖', description: 'Smoked meats and Texas-style barbecue' },
-  { name: 'Asian', slug: 'asian', emoji: '🥢', description: 'Chinese, Japanese, Thai, and more' },
-  { name: 'American', slug: 'american', emoji: '🍔', description: 'Burgers, steaks, and comfort food' },
-  { name: 'Seafood', slug: 'seafood', emoji: '🦐', description: 'Fresh catches and coastal favorites' },
-  { name: 'Indian', slug: 'indian', emoji: '🍛', description: 'Curries, tandoori, and spiced delights' },
-  { name: 'Greek', slug: 'greek', emoji: '🥙', description: 'Mediterranean flavors and fresh ingredients' },
-  { name: 'Breakfast', slug: 'breakfast', emoji: '🥞', description: 'All-day breakfast and brunch spots' },
-  { name: 'Italian', slug: 'italian', emoji: '🍝', description: 'Pizza, pasta, and Italian classics' },
-  { name: 'Chinese', slug: 'chinese', emoji: '🥟', description: 'Authentic Chinese and fusion dishes' },
-  { name: 'Japanese', slug: 'japanese', emoji: '🍱', description: 'Sushi, ramen, and Japanese cuisine' },
-  { name: 'Thai', slug: 'thai', emoji: '🌶️', description: 'Spicy and flavorful Thai dishes' },
-  { name: 'Vietnamese', slug: 'vietnamese', emoji: '🍜', description: 'Pho, banh mi, and Vietnamese specialties' },
-  { name: 'Bar', slug: 'bar', emoji: '🍺', description: 'Pubs, sports bars, and nightlife' },
-  { name: 'Healthy', slug: 'healthy', emoji: '🥗', description: 'Salads, smoothies, and healthy options' },
-  { name: 'Desserts', slug: 'desserts', emoji: '🍰', description: 'Sweet treats and dessert spots' }
-]
+export const revalidate = 3600
 
-export default function CategoryPage() {
-  const params = useParams()
-  const slug = params.slug as string
-  const category = allCategories.find(c => c.slug === slug)
-  
-  const [restaurants, setRestaurants] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [count, setCount] = useState(0)
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://ekaty.com'
+const MAX_LISTINGS = 48
 
-  useEffect(() => {
-    if (category) {
-      fetchRestaurants()
-    }
-  }, [category])
+export async function generateStaticParams() {
+  return RESTAURANT_CATEGORIES.map((category) => ({ slug: category.slug }))
+}
 
-  const fetchRestaurants = async () => {
-    if (!category) return
-    
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/restaurants?category=${encodeURIComponent(category.name)}&limit=50`)
-      const data = await response.json()
-      setRestaurants(data.restaurants || [])
-      setCount(data.pagination?.total || 0)
-    } catch (error) {
-      console.error('Error fetching restaurants:', error)
-      setRestaurants([])
-    } finally {
-      setLoading(false)
-    }
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const category = findCategory(params.slug)
+  if (!category) {
+    return { title: 'Category Not Found | eKaty.com', robots: { index: false, follow: true } }
   }
 
-  if (!category) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Category not found</h1>
-          <Link href="/categories" className="btn-primary">
-            View All Categories
-          </Link>
-        </div>
-      </div>
-    )
+  const { pagination } = await searchRestaurants({ categoryTags: category.tags, limit: 1 })
+  const total = pagination.total
+  const title = `${total} Best ${category.heading} in Katy, TX (2026) | eKaty.com`
+  const description = `${category.blurb} Browse all ${total} on eKaty with hours, phone numbers, addresses and directions.`.slice(0, 300)
+  const url = `${SITE_URL}/categories/${category.slug}`
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    // A page listing three places isn't worth putting in front of a searcher.
+    robots: total < THIN_CATEGORY_THRESHOLD ? { index: false, follow: true } : undefined,
+    openGraph: { title, description, url, siteName: 'eKaty.com', type: 'website' },
+    twitter: { card: 'summary', title, description },
+  }
+}
+
+export default async function CategoryPage({ params }: { params: { slug: string } }) {
+  const category = findCategory(params.slug)
+  if (!category) notFound()
+
+  const { restaurants, pagination } = await searchRestaurants({
+    categoryTags: category.tags,
+    limit: MAX_LISTINGS,
+    sortBy: 'rating',
+  })
+
+  const url = `${SITE_URL}/categories/${category.slug}`
+  const siblings = RESTAURANT_CATEGORIES.filter((c) => c.slug !== category.slug)
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: `${category.heading} in Katy, TX`,
+    description: category.blurb,
+    url,
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: pagination.total,
+      itemListElement: restaurants.map((restaurant: any, index: number) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: `${SITE_URL}/restaurants/${restaurant.slug}`,
+        name: restaurant.name,
+      })),
+    },
+  }
+
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Categories', item: `${SITE_URL}/categories` },
+      { '@type': 'ListItem', position: 2, name: category.heading, item: url },
+    ],
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Breadcrumbs */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <nav className="flex items-center space-x-2 text-sm">
-            <Link href="/" className="text-gray-500 hover:text-gray-700">
-              Home
-            </Link>
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <Link href="/categories" className="text-gray-500 hover:text-gray-700">
-              Categories
-            </Link>
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <span className="text-gray-900 font-medium">{category.name}</span>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <nav className="mb-4 text-sm text-gray-500" aria-label="Breadcrumb">
+            <Link href="/" className="hover:text-primary-600">Home</Link>
+            <span className="mx-2">/</span>
+            <Link href="/categories" className="hover:text-primary-600">Categories</Link>
+            <span className="mx-2">/</span>
+            <span className="text-gray-900">{category.name}</span>
           </nav>
+
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+            <span className="mr-3" aria-hidden="true">{category.emoji}</span>
+            {category.heading} in Katy, TX
+          </h1>
+          <p className="mt-4 max-w-3xl text-lg text-gray-600">{category.blurb}</p>
+          <p className="mt-4 text-sm font-medium text-gray-500">
+            {pagination.total} {pagination.total === 1 ? 'restaurant' : 'restaurants'} listed in Katy and the surrounding area
+          </p>
         </div>
       </div>
 
-      {/* Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-6xl">{category.emoji}</span>
-            <div>
-              <h1 className="text-4xl font-bold">
-                {category.name} Restaurants in Katy
-              </h1>
-              <p className="text-xl text-primary-100 mt-2">
-                {category.description}
-              </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        {restaurants.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {diversifyAdjacentPhotos(restaurants).map((restaurant: any) => (
+                <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+              ))}
             </div>
-          </div>
-          {count > 0 && (
-            <p className="text-primary-100 mt-4">
-              Found {count} {category.name.toLowerCase()} {count === 1 ? 'restaurant' : 'restaurants'}
-            </p>
-          )}
-        </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-gray-200 rounded-lg h-64 animate-pulse"></div>
-            ))}
-          </div>
-        ) : restaurants.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {restaurants.map((restaurant) => (
-              <RestaurantCard key={restaurant.id} restaurant={restaurant} />
-            ))}
-          </div>
+            {pagination.total > restaurants.length && (
+              <div className="mt-10 text-center">
+                <Link href={`/discover?q=${encodeURIComponent(category.name)}`} className="btn-primary">
+                  See all {pagination.total} {category.name.toLowerCase()} results
+                </Link>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="text-center py-12 bg-white rounded-lg">
-            <div className="text-6xl mb-4">😕</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              No {category.name} restaurants found
-            </h3>
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4" aria-hidden="true">{category.emoji}</div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Nothing listed here yet</h2>
             <p className="text-gray-600 mb-6">
-              We're constantly adding new restaurants. Check back soon!
+              No {category.name.toLowerCase()} restaurants are in the directory at the moment.
             </p>
-            <Link href="/categories" className="btn-primary">
-              View All Categories
-            </Link>
+            <Link href="/discover" className="btn-primary">Browse every Katy restaurant</Link>
           </div>
         )}
+
+        <div className="mt-16 border-t border-gray-200 pt-10">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Browse other cuisines in Katy</h2>
+          <div className="flex flex-wrap gap-2">
+            {siblings.map((sibling) => (
+              <Link
+                key={sibling.slug}
+                href={`/categories/${sibling.slug}`}
+                className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:border-primary-500 hover:text-primary-700"
+              >
+                <span aria-hidden="true">{sibling.emoji}</span>
+                {sibling.name}
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
