@@ -74,6 +74,7 @@ export type MatchReasonKind =
   | 'nearby_zip'
   | 'area'
   | 'vibe'
+  | 'vibe_price'
   | 'kids'
   | 'party_size'
   | 'open_now'

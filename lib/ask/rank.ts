@@ -314,6 +314,7 @@ export function scoreCandidate(
 
   // Vibe, matched against tags, features, categories and description.
   let vibeWeight = 0
+  let pricedForVibe = false
   for (const label of schema.vibe) {
     const def = VIBES.find((vibe) => vibe.label === label)
     if (!def) continue
@@ -328,12 +329,15 @@ export function scoreCandidate(
       continue
     }
 
-    // Weaker corroboration: the price tier suits the vibe even though no tag
-    // says so. Worth a nudge, not worth claiming in a why-line.
+    // Weaker corroboration: no tag names the vibe, but the price tier is in the
+    // range the vibe usually sits in. Cited only as the stored tier, once.
     const candidateTier = ({ BUDGET: 'low', MODERATE: 'mid', UPSCALE: 'high', PREMIUM: 'high' } as const)[
       candidate.priceLevel
     ]
-    if (def.priceTiers && def.priceTiers.includes(candidateTier)) vibeWeight += 0.5
+    if (!pricedForVibe && def.priceTiers && def.priceTiers.includes(candidateTier)) {
+      pricedForVibe = true
+      addReason({ kind: 'vibe_price', detail: priceSymbol, weight: 0.5 })
+    }
   }
 
   if (schema.kids === true) {
@@ -391,7 +395,10 @@ export function scoreCandidate(
 
   return {
     score: Math.round(score * 1000) / 1000,
-    reasons: reasons.filter((reason) => reason.weight > 0).sort((a, b) => b.weight - a.weight),
+    reasons: reasons
+      .filter((reason) => reason.weight > 0)
+      .sort((a, b) => b.weight - a.weight)
+      .map((reason) => ({ ...reason, weight: Math.round(reason.weight * 100) / 100 })),
   }
 }
 

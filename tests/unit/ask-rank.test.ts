@@ -371,6 +371,15 @@ describe('runAsk', () => {
       expect(lines).not.toMatch(/independent|locally owned|family owned/i)
     })
 
+    it('falls back to the stored price tier when only a filter cleared', () => {
+      const result = runAsk('date night not chains', POOL)
+      const runnerUp = result.picks[1]
+
+      expect(runnerUp.why).toMatch(/clears your no-chains filter/i)
+      expect(runnerUp.why).toContain('price tier')
+      expect(runnerUp.reasons.map((reason) => reason.kind)).toContain('vibe_price')
+    })
+
     it('never claims social proof', () => {
       const queries = ['cheap mexican', 'date night not chains', 'bbq with kids', 'surprise me']
       for (const query of queries) {

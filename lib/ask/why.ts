@@ -20,6 +20,7 @@ function clauseFor(reason: MatchReason): string | null {
       return `listed under ${reason.detail}`
     case 'budget':
     case 'budget_cap':
+    case 'vibe_price':
       return `${reason.detail} price tier`
     case 'zip':
       return `in ${reason.detail}`
