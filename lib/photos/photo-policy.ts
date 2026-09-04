@@ -86,19 +86,31 @@ const BRAND_MARKETING_HINTS = [
   '/media-kit/',
   '/newsroom/',
   'wordmark',
+  // Store-badge artwork. Every McDonald's row held the same
+  // RestaurantLocator_Googleplay_236x76.png, which is an app-store button.
+  'googleplay',
+  'google-play',
+  'google_play',
+  'app-store',
+  'app_store',
+  'appstore',
+  'play-store',
+  'app-icon',
+  'appicon',
 ]
 
 /**
- * Corporate domains that serve brand marketing only, so no image from them is a
- * photograph of an individual location. Restricted to hosts actually observed
- * in the `photos` column — extend it when an audit surfaces another.
+ * Corporate domains observed serving brand collateral and nothing else, so no
+ * image from them is a photograph of an individual location.
+ *
+ * The bar for adding a host is high: it must never serve per-store photography.
+ * static.cfacdn.com looked like a candidate and is deliberately absent, because
+ * it serves real photographs keyed by store number
+ * (/photos/restaurants/00943/large.jpg), and a listing's own photo is the thing
+ * this module exists to protect. When a chain's imagery is ambiguous, leave it
+ * to the path rules above and to the per-grid chain cap.
  */
-const NATIONAL_BRAND_HOSTS = [
-  'starbucks.com',
-  'cfacdn.com',
-  'jackinthebox.com',
-  'portillos.com',
-]
+const NATIONAL_BRAND_HOSTS = ['starbucks.com', 'mcdonalds.com', 'portillos.com']
 
 export function isStockPhotoUrl(url: string): boolean {
   try {

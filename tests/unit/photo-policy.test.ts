@@ -51,10 +51,26 @@ describe('brand marketing imagery', () => {
     expect(isBrandMarketingImageUrl('https://example.com/img/twitter-card.png')).toBe(true)
   })
 
-  it('rejects any image served from a chain corporate host', () => {
+  it('rejects app-store badge artwork', () => {
+    // What all sixteen McDonald's rows were holding.
+    expect(
+      assessPhotoUrl(
+        'https://www.mcdonalds.com/content/dam/sites/usa/nfl/images/RestaurantLocator_Googleplay_236x76.png'
+      ).reason
+    ).toBe('brand_marketing')
+  })
+
+  it('rejects any image served from a corporate marketing host', () => {
     expect(isBrandMarketingImageUrl('https://www.starbucks.com/img/store-front.jpg')).toBe(true)
-    expect(isBrandMarketingImageUrl('https://static.cfacdn.com/img/meal.jpg')).toBe(true)
-    expect(isBrandMarketingImageUrl('https://locations.jackinthebox.com/x/photo.jpg')).toBe(true)
+    expect(isBrandMarketingImageUrl('https://www.mcdonalds.com/content/dam/x.png')).toBe(true)
+  })
+
+  it('keeps a chain CDN that serves real per-store photography', () => {
+    // Chick-fil-A publishes a photograph per store number. Rejecting the host
+    // would delete genuine venue photos, which is the opposite of the point.
+    expect(
+      assessPhotoUrl('https://static.cfacdn.com/photos/restaurants/00943/large.jpg').ok
+    ).toBe(true)
   })
 
   it('leaves genuine venue photography alone', () => {
