@@ -54,6 +54,40 @@ function SchemaChips({ schema }: { schema: AskSchema }) {
   )
 }
 
+/**
+ * The listing's own stored photo, or a muted block carrying its initial.
+ *
+ * `pick.imageUrl` is null whenever the row has no photo we can stand behind, and
+ * a stored URL can still 404, so both cases land on the same placeholder. Ask
+ * would rather show an obvious blank than a stock photo of someone else's
+ * dining room — the same reason it returns two picks instead of padding to three.
+ */
+function PickPhoto({ pick }: { pick: AskPick }) {
+  const [failed, setFailed] = useState(false)
+  const photo = failed ? null : pick.imageUrl
+
+  return (
+    <div className="h-20 w-20 flex-none overflow-hidden rounded-lg bg-gray-100 sm:h-24 sm:w-24">
+      {photo ? (
+        <img
+          src={photo}
+          alt={`${pick.name} in Katy`}
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div
+          className="flex h-full w-full items-center justify-center bg-gray-100 text-2xl font-bold text-gray-400"
+          aria-hidden="true"
+        >
+          {pick.name.trim().charAt(0).toUpperCase() || '?'}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PickCard({
   pick,
   position,
@@ -67,6 +101,15 @@ function PickCard({
 }) {
   const trackedSource = source === 'api' ? 'ask' : source
 
+  const trackClick = () =>
+    trackAskPickClick({
+      restaurantId: pick.id,
+      restaurantName: pick.name,
+      position,
+      source: trackedSource,
+      query,
+    })
+
   return (
     <div className="card p-5 sm:p-6">
       <div className="flex items-start gap-4">
@@ -74,19 +117,15 @@ function PickCard({
           {position}
         </div>
 
+        <Link href={pick.url} onClick={trackClick} aria-label={pick.name} tabIndex={-1}>
+          <PickPhoto pick={pick} />
+        </Link>
+
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <Link
               href={pick.url}
-              onClick={() =>
-                trackAskPickClick({
-                  restaurantId: pick.id,
-                  restaurantName: pick.name,
-                  position,
-                  source: trackedSource,
-                  query,
-                })
-              }
+              onClick={trackClick}
               className="text-xl font-bold text-gray-900 hover:text-primary-600"
             >
               {pick.name}
@@ -109,15 +148,7 @@ function PickCard({
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href={pick.url}
-              onClick={() =>
-                trackAskPickClick({
-                  restaurantId: pick.id,
-                  restaurantName: pick.name,
-                  position,
-                  source: trackedSource,
-                  query,
-                })
-              }
+              onClick={trackClick}
               className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
             >
               See the listing

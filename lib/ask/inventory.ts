@@ -5,6 +5,7 @@
 // /api/restaurants and /api/spin do, and normalizes them into `AskCandidate`.
 
 import { prisma } from '@/lib/prisma'
+import { resolveCandidatePhoto } from './photo'
 import { PRICE_LEVEL_ORDER, type AskCandidate, type PriceLevel } from './types'
 
 /**
@@ -36,6 +37,8 @@ const INVENTORY_SELECT = {
   reviewCount: true,
   featured: true,
   metadata: true,
+  photos: true,
+  logoUrl: true,
 } as const
 
 function splitList(value: string | null | undefined): string[] {
@@ -85,6 +88,8 @@ type InventoryRow = {
   reviewCount: number
   featured: boolean
   metadata: string | null
+  photos: string | null
+  logoUrl: string | null
 }
 
 /** Maps a `restaurants` row onto the ranking shape. No field is synthesized. */
@@ -108,6 +113,11 @@ export function toAskCandidate(row: InventoryRow): AskCandidate {
     reviewCount: row.reviewCount ?? 0,
     featured: Boolean(row.featured),
     hours: row.hours,
+    imageUrl: resolveCandidatePhoto({
+      photos: row.photos,
+      logoUrl: row.logoUrl,
+      metadata,
+    }),
   }
 }
 
