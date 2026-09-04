@@ -4,10 +4,11 @@ import path from 'path'
 
 import {
   ALLOWED_UPLOAD_CONTENT_TYPES,
+  assertSafeUploadKey,
   assertUploadableImage,
   buildUploadKey,
   contentTypeForKey,
-  extensionFor,
+  extensionForContentType,
   getUploadRoots,
   isSafeInlineContentType,
   readLocalUpload,
@@ -55,15 +56,17 @@ describe('upload-storage', () => {
     })
   })
 
-  describe('extensionFor', () => {
-    it('uses the original extension when it looks sane', () => {
-      expect(extensionFor('photo.JPEG', 'image/jpeg')).toBe('jpeg')
+  describe('extensionForContentType', () => {
+    it('derives the extension from the validated content type', () => {
+      expect(extensionForContentType('image/jpeg')).toBe('jpg')
+      expect(extensionForContentType('image/PNG')).toBe('png')
+      expect(extensionForContentType('image/webp; charset=binary')).toBe('webp')
     })
 
-    it('falls back to the content type when the name has no extension', () => {
-      expect(extensionFor('screenshot', 'image/png')).toBe('png')
-      expect(extensionFor(undefined, 'image/webp')).toBe('webp')
-      expect(extensionFor('blob', 'application/x-thing')).toBe('bin')
+    it('refuses types that are not inert raster images', () => {
+      expect(() => extensionForContentType('image/svg+xml')).toThrow(UploadStorageError)
+      expect(() => extensionForContentType('text/html')).toThrow(UploadStorageError)
+      expect(() => extensionForContentType('')).toThrow(UploadStorageError)
     })
   })
 
@@ -71,11 +74,18 @@ describe('upload-storage', () => {
     const key = buildUploadKey({
       folder: 'restaurants',
       prefix: 'hero',
-      originalName: 'my hero.jpg',
       contentType: 'image/jpeg',
     })
 
     expect(key).toMatch(/^restaurants\/hero-\d+-[a-z0-9]+\.jpg$/)
+  })
+
+  it('never derives a stored extension from the uploaded filename', () => {
+    // A JPEG-typed "xss.html" must not be stored as .html and served as active content
+    const key = buildUploadKey({ folder: 'restaurants', prefix: 'hero', contentType: 'image/jpeg' })
+
+    expect(key.endsWith('.jpg')).toBe(true)
+    expect(key).not.toMatch(/\.(html?|js|svg)$/)
   })
 
   it('maps keys back to content types', () => {
@@ -112,6 +122,33 @@ describe('upload-storage', () => {
       for (const contentType of ALLOWED_UPLOAD_CONTENT_TYPES) {
         expect(() => assertUploadableImage(contentType, 'photo.jpg')).not.toThrow()
       }
+    })
+
+    it('rejects raster-typed uploads whose filename is executable', () => {
+      expect(() => assertUploadableImage('image/jpeg', 'xss.html')).toThrow(/Unsupported image file name/i)
+      expect(() => assertUploadableImage('image/jpeg', 'xss.js')).toThrow(/Unsupported image file name/i)
+      expect(() => assertUploadableImage('image/png', 'sneaky.PHTML')).toThrow(/Unsupported image file name/i)
+      // Extensionless names are fine: the stored extension comes from the type
+      expect(() => assertUploadableImage('image/png', 'screenshot')).not.toThrow()
+    })
+
+    it('refuses to store a key whose extension is not an inert raster type', () => {
+      expect(() => assertSafeUploadKey('restaurants/hero-1.jpg')).not.toThrow()
+      expect(() => assertSafeUploadKey('restaurants/hero-1.html')).toThrow(/Refusing to store/i)
+      expect(() => assertSafeUploadKey('restaurants/hero-1.js')).toThrow(/Refusing to store/i)
+      expect(() => assertSafeUploadKey('restaurants/hero-1')).toThrow(/Refusing to store/i)
+    })
+
+    it('refuses to write an executable key even with a raster content type', async () => {
+      await expect(
+        saveUpload({
+          buffer: Buffer.from('<script>alert(1)</script>'),
+          key: 'restaurants/xss.html',
+          contentType: 'image/jpeg',
+        })
+      ).rejects.toThrow(UploadStorageError)
+
+      expect(existsSync(path.join(workDir, 'public', 'uploads', 'restaurants', 'xss.html'))).toBe(false)
     })
 
     it('refuses to write an SVG even if a route forgets to validate', async () => {

@@ -101,12 +101,20 @@ export function sanitizeUploadKey(key: string): string {
   return segments.join('/')
 }
 
-export function extensionFor(originalName: string | undefined, contentType: string): string {
-  const fromName = (originalName || '').split('.').pop()?.toLowerCase() ?? ''
-  if (fromName && fromName !== originalName?.toLowerCase() && /^[a-z0-9]{2,5}$/.test(fromName)) {
-    return fromName
+/**
+ * The stored extension comes from the validated content type, never from the
+ * uploaded filename. Trusting the filename let `xss.html` (declared as a JPEG)
+ * be stored as `.html` and then served as active content from this origin.
+ */
+export function extensionForContentType(contentType: string): string {
+  const normalized = (contentType || '').toLowerCase().split(';')[0].trim()
+  const extension = EXTENSION_BY_CONTENT_TYPE[normalized]
+
+  if (!extension) {
+    throw new UploadStorageError(`Unsupported image type${normalized ? ` (${normalized})` : ''}`)
   }
-  return EXTENSION_BY_CONTENT_TYPE[contentType.toLowerCase()] || 'bin'
+
+  return extension
 }
 
 export function contentTypeForKey(key: string): string {
@@ -119,25 +127,46 @@ export function isSafeInlineContentType(contentType: string): boolean {
   return SAFE_INLINE_CONTENT_TYPES.has(contentType.toLowerCase().split(';')[0].trim())
 }
 
+const FRIENDLY_TYPE_LIST = 'JPEG, PNG, WebP, GIF or AVIF'
+
 /**
- * Gate for incoming uploads. Rejects anything that is not an inert raster
- * image, by declared type and by filename, so an SVG cannot slip through by
- * claiming to be a PNG or by arriving with a mislabelled content type.
+ * Gate for incoming uploads. Accepts only inert raster images, checking the
+ * declared type and the filename, so neither a mislabelled SVG nor a file named
+ * `xss.html` can get through.
  */
 export function assertUploadableImage(contentType: string, originalName?: string): void {
   const normalized = (contentType || '').toLowerCase().split(';')[0].trim()
-  const extension = (originalName || '').split('.').pop()?.toLowerCase() ?? ''
-  const friendlyList = 'JPEG, PNG, WebP, GIF or AVIF'
+  const name = (originalName || '').toLowerCase()
+  const extension = name.includes('.') ? name.split('.').pop() ?? '' : ''
 
   if (normalized === 'image/svg+xml' || normalized === 'image/svg' || extension === 'svg' || extension === 'svgz') {
     throw new UploadStorageError(
-      `SVG images are not accepted because they can carry scripts. Please upload a ${friendlyList} image.`
+      `SVG images are not accepted because they can carry scripts. Please upload a ${FRIENDLY_TYPE_LIST} image.`
     )
   }
 
   if (!EXTENSION_BY_CONTENT_TYPE[normalized]) {
     throw new UploadStorageError(
-      `Unsupported image type${normalized ? ` (${normalized})` : ''}. Please upload a ${friendlyList} image.`
+      `Unsupported image type${normalized ? ` (${normalized})` : ''}. Please upload a ${FRIENDLY_TYPE_LIST} image.`
+    )
+  }
+
+  // A raster content type with a non-raster extension is either a mistake or an
+  // attempt to have the file served as something executable.
+  if (extension && !CONTENT_TYPE_BY_EXTENSION[extension]) {
+    throw new UploadStorageError(
+      `Unsupported image file name (.${extension}). Please upload a ${FRIENDLY_TYPE_LIST} image.`
+    )
+  }
+}
+
+/** Rejects any storage key that would not be served as an inert raster image. */
+export function assertSafeUploadKey(key: string): void {
+  const extension = key.includes('.') ? key.split('.').pop()?.toLowerCase() ?? '' : ''
+
+  if (!CONTENT_TYPE_BY_EXTENSION[extension]) {
+    throw new UploadStorageError(
+      `Refusing to store upload with extension "${extension || '(none)'}" — only ${FRIENDLY_TYPE_LIST} files are stored.`
     )
   }
 }
@@ -145,14 +174,13 @@ export function assertUploadableImage(contentType: string, originalName?: string
 export function buildUploadKey(options: {
   folder: string
   prefix: string
-  originalName?: string
   contentType: string
 }): string {
-  const { folder, prefix, originalName, contentType } = options
+  const { folder, prefix, contentType } = options
   const safePrefix = prefix.replace(/[^A-Za-z0-9_-]/g, '') || 'file'
   const timestamp = Date.now()
   const randomString = Math.random().toString(36).slice(2, 8)
-  const extension = extensionFor(originalName, contentType)
+  const extension = extensionForContentType(contentType)
 
   return sanitizeUploadKey(`${folder}/${safePrefix}-${timestamp}-${randomString}.${extension}`)
 }
@@ -170,6 +198,7 @@ export async function saveUpload(options: {
   // Last line of defence: nothing executable is ever written to a public tree,
   // whatever a caller validated (or forgot to validate) upstream.
   assertUploadableImage(options.contentType, key)
+  assertSafeUploadKey(key)
 
   if (isR2Configured()) {
     try {

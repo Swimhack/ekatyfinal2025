@@ -61,7 +61,6 @@ export async function POST(request: NextRequest) {
     const key = buildUploadKey({
       folder: 'profiles',
       prefix: user.id,
-      originalName: file.name,
       contentType: file.type,
     })
 

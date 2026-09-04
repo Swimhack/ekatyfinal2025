@@ -80,12 +80,33 @@ export function orderPhotosWithHeroFirst(photos: PhotosInput, heroImage: string 
   return [hero, ...deduped.filter((photo) => photo !== hero)]
 }
 
+/**
+ * Metadata flag recording that the hero URL was added to `photos` by
+ * `applyHeroImage` rather than being a gallery photo in its own right. Clearing
+ * the hero then knows whether removing it from `photos` would lose a photo the
+ * restaurant had independently.
+ */
+const HERO_IN_PHOTOS_FLAG = 'heroImageAddedToPhotos'
+
+/**
+ * Where the hero URL sat in `photos` before it was promoted to the front, so
+ * clearing the hero can put a gallery photo back where the admin had it instead
+ * of leaving it pinned first.
+ */
+const HERO_PHOTO_INDEX_KEY = 'heroImagePreviousPhotoIndex'
+
+export interface HeroImageWrite {
+  metadata: Record<string, any>
+  photos: string[]
+  photosCsv: string
+}
+
 /** Writes the hero to every key consumers read, and promotes it to `photos[0]`. */
 export function applyHeroImage(options: {
   metadata: MetadataInput
   photos: PhotosInput
   heroImage: string
-}): { metadata: Record<string, any>; photos: string[]; photosCsv: string } {
+}): HeroImageWrite {
   const metadata = parseRestaurantMetadata(options.metadata)
   const hero = normalizeUrl(options.heroImage)
 
@@ -93,20 +114,66 @@ export function applyHeroImage(options: {
     throw new Error('applyHeroImage requires a non-empty hero image URL')
   }
 
+  const existingPhotos = parsePhotos(options.photos)
+  const previousHero = resolveExplicitHeroImage(options.metadata)
+  const wasGalleryPhoto =
+    existingPhotos.includes(hero) &&
+    // A hero this function previously injected doesn't count as a gallery photo.
+    !(previousHero === hero && metadata[HERO_IN_PHOTOS_FLAG] === true)
+
   metadata.heroImage = hero
   metadata.profileImageUrl = hero
+  metadata[HERO_IN_PHOTOS_FLAG] = !wasGalleryPhoto
 
-  const photos = orderPhotosWithHeroFirst(options.photos, hero)
+  if (wasGalleryPhoto) {
+    metadata[HERO_PHOTO_INDEX_KEY] = existingPhotos.indexOf(hero)
+  } else {
+    delete metadata[HERO_PHOTO_INDEX_KEY]
+  }
+
+  const photos = orderPhotosWithHeroFirst(existingPhotos, hero)
 
   return { metadata, photos, photosCsv: serializePhotos(photos) }
 }
 
-/** Clears every hero key, leaving `photos` to provide the fallback. */
-export function clearHeroImage(metadata: MetadataInput): Record<string, any> {
-  const next = parseRestaurantMetadata(metadata)
-  delete next.heroImage
-  delete next.profileImageUrl
-  return next
+/**
+ * Clears every hero key and undoes the `photos[0]` promotion.
+ *
+ * Deleting the metadata keys alone was not enough: `resolveHeroImage` falls back
+ * to `photos[0]`, so the image that was just cleared kept showing on public
+ * pages. The URL is dropped from `photos` only when this module put it there.
+ */
+export function clearHeroImage(options: {
+  metadata: MetadataInput
+  photos?: PhotosInput
+}): HeroImageWrite {
+  const metadata = parseRestaurantMetadata(options.metadata)
+  const previousHero = resolveExplicitHeroImage(options.metadata)
+  const wasAddedByUs = metadata[HERO_IN_PHOTOS_FLAG] === true
+  const previousIndex = metadata[HERO_PHOTO_INDEX_KEY]
+
+  delete metadata.heroImage
+  delete metadata.profileImageUrl
+  delete metadata[HERO_IN_PHOTOS_FLAG]
+  delete metadata[HERO_PHOTO_INDEX_KEY]
+
+  let photos = parsePhotos(options.photos)
+
+  if (previousHero && photos.includes(previousHero)) {
+    const without = photos.filter((photo) => photo !== previousHero)
+
+    if (wasAddedByUs) {
+      // This module put it in the list, so clearing takes it back out.
+      photos = without
+    } else if (typeof previousIndex === 'number' && previousIndex >= 0) {
+      // It was already a gallery photo: restore its original position so it
+      // stops being the primary image.
+      const target = Math.min(previousIndex, without.length)
+      photos = [...without.slice(0, target), previousHero, ...without.slice(target)]
+    }
+  }
+
+  return { metadata, photos, photosCsv: serializePhotos(photos) }
 }
 
 /**

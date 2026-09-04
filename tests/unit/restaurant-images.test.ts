@@ -102,6 +102,29 @@ describe('applyHeroImage', () => {
     expect(result.photosCsv).toBe(`${UPLOADED_HERO},${BRAND_OG},/b.jpg`)
   })
 
+  it('records whether the hero was added to photos or already a gallery photo', () => {
+    const added = applyHeroImage({ metadata: {}, photos: [BRAND_OG], heroImage: UPLOADED_HERO })
+    expect(added.metadata.heroImageAddedToPhotos).toBe(true)
+
+    const promotedExisting = applyHeroImage({
+      metadata: {},
+      photos: [BRAND_OG, UPLOADED_HERO],
+      heroImage: UPLOADED_HERO,
+    })
+    expect(promotedExisting.metadata.heroImageAddedToPhotos).toBe(false)
+  })
+
+  it('keeps the added flag when the same hero is saved twice', () => {
+    const first = applyHeroImage({ metadata: {}, photos: [BRAND_OG], heroImage: UPLOADED_HERO })
+    const second = applyHeroImage({
+      metadata: first.metadata,
+      photos: first.photos,
+      heroImage: UPLOADED_HERO,
+    })
+
+    expect(second.metadata.heroImageAddedToPhotos).toBe(true)
+  })
+
   it('never duplicates a hero that was already in photos', () => {
     const result = applyHeroImage({
       metadata: {},
@@ -120,12 +143,73 @@ describe('applyHeroImage', () => {
 describe('clearHeroImage', () => {
   it('drops both hero keys and keeps the rest', () => {
     const cleared = clearHeroImage({
-      heroImage: UPLOADED_HERO,
-      profileImageUrl: UPLOADED_HERO,
-      googlePlaceId: 'abc',
+      metadata: {
+        heroImage: UPLOADED_HERO,
+        profileImageUrl: UPLOADED_HERO,
+        googlePlaceId: 'abc',
+      },
     })
 
-    expect(cleared).toEqual({ googlePlaceId: 'abc' })
+    expect(cleared.metadata).toEqual({ googlePlaceId: 'abc' })
+  })
+
+  it('removes the hero from photos so it cannot win via the photos[0] fallback', () => {
+    const saved = applyHeroImage({
+      metadata: {},
+      photos: `${BRAND_OG},/b.jpg`,
+      heroImage: UPLOADED_HERO,
+    })
+
+    const cleared = clearHeroImage({ metadata: saved.metadata, photos: saved.photos })
+
+    expect(cleared.photos).toEqual([BRAND_OG, '/b.jpg'])
+    expect(cleared.photosCsv).toBe(`${BRAND_OG},/b.jpg`)
+    // The point of the fix: resolution no longer returns the cleared image
+    expect(resolveHeroImage({ metadata: cleared.metadata, photos: cleared.photos })).toBe(BRAND_OG)
+  })
+
+  it('keeps a gallery photo but restores its original position', () => {
+    const saved = applyHeroImage({
+      metadata: {},
+      photos: [BRAND_OG, UPLOADED_HERO],
+      heroImage: UPLOADED_HERO,
+    })
+    expect(saved.photos).toEqual([UPLOADED_HERO, BRAND_OG])
+
+    const cleared = clearHeroImage({ metadata: saved.metadata, photos: saved.photos })
+
+    // Back where the admin had it, so it is no longer the primary image
+    expect(cleared.photos).toEqual([BRAND_OG, UPLOADED_HERO])
+    expect(resolveHeroImage({ metadata: cleared.metadata, photos: cleared.photos })).toBe(BRAND_OG)
+  })
+
+  it('tolerates photos changing between saving and clearing a hero', () => {
+    const saved = applyHeroImage({
+      metadata: {},
+      photos: [BRAND_OG, '/b.jpg', UPLOADED_HERO],
+      heroImage: UPLOADED_HERO,
+    })
+
+    // Admin deleted the other photos in the meantime
+    const cleared = clearHeroImage({ metadata: saved.metadata, photos: [UPLOADED_HERO] })
+
+    expect(cleared.photos).toEqual([UPLOADED_HERO])
+  })
+
+  it('leaves photos alone for legacy rows saved before the flag existed', () => {
+    const cleared = clearHeroImage({
+      metadata: { profileImageUrl: '/uploads/restaurants/legacy.jpg' },
+      photos: `${BRAND_OG},/b.jpg`,
+    })
+
+    expect(cleared.photos).toEqual([BRAND_OG, '/b.jpg'])
+  })
+
+  it('clearing with no hero set is a no-op on photos', () => {
+    const cleared = clearHeroImage({ metadata: {}, photos: BRAND_OG })
+
+    expect(cleared.metadata).toEqual({})
+    expect(cleared.photos).toEqual([BRAND_OG])
   })
 })
 

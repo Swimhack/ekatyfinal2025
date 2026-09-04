@@ -60,7 +60,6 @@ export async function POST(request: NextRequest) {
     const key = buildUploadKey({
       folder: 'restaurants',
       prefix: type,
-      originalName: file.name,
       contentType: file.type,
     })
 

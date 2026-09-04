@@ -100,9 +100,15 @@ export async function PATCH(
         photosValue = applied.photosCsv
         console.log('Setting hero image everywhere (metadata + photos[0]):', heroImage)
       } else if (heroImage === '' || heroImage === null) {
-        // Explicitly clear both hero keys; photos[0] becomes the fallback again
-        metadata = clearHeroImage(metadata)
-        console.log('Removing hero image from metadata (empty value provided)')
+        // Clear both hero keys and undo the photos[0] promotion, otherwise the
+        // cleared image keeps winning through the photos[0] fallback.
+        const cleared = clearHeroImage({
+          metadata,
+          photos: photosValue !== undefined ? photosValue : currentRestaurant?.photos
+        })
+        metadata = cleared.metadata
+        photosValue = cleared.photosCsv
+        console.log('Removing hero image from metadata and photos (empty value provided)')
       }
     }
 

@@ -25,12 +25,13 @@ const nextConfig = {
   },
   async rewrites() {
     return {
-      // SVG never reaches the static handler: files stored before SVG uploads
-      // were refused must not be served as executable image/svg+xml on this
-      // origin. The route handler sends them as a download instead.
+      // Anything a browser could treat as active content never reaches the
+      // static handler. New uploads can only be raster images, but files stored
+      // before that gate existed must not be served as SVG/HTML/JS from this
+      // origin; the route handler sends them as a download instead.
       beforeFiles: [
         {
-          source: '/uploads/:path(.*\\.svgz?)',
+          source: '/uploads/:path(.*\\.(?:svgz?|x?html?|shtml|m?js|cjs|css|xml|xsl|json|pdf|swf|htaccess))',
           destination: '/api/uploads/:path',
         },
       ],
