@@ -16,12 +16,26 @@ interface SpinRevealCardProps {
   onClose: () => void
 }
 
+/**
+ * Imported rows repeat the same label in different shapes ("BBQ", "bbq",
+ * "smoked-meats"), so normalise separators and de-duplicate case-insensitively.
+ */
 function cuisineLabel(restaurant: SpinnerRestaurant): string {
-  const labels = [...restaurant.categories, ...restaurant.cuisineTypes]
-    .map(label => label.replace(/_/g, ' ').trim())
-    .filter(label => label && !/^(food|restaurant|point of interest|establishment)$/i.test(label))
+  const seen = new Set<string>()
+  const labels: string[] = []
 
-  return Array.from(new Set(labels)).slice(0, 3).join(' · ')
+  for (const raw of [...restaurant.categories, ...restaurant.cuisineTypes]) {
+    const label = raw.replace(/[_-]+/g, ' ').trim()
+    if (!label || /^(food|restaurant|point of interest|establishment)$/i.test(label)) continue
+
+    const key = label.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    labels.push(label)
+    if (labels.length === 3) break
+  }
+
+  return labels.join(' · ')
 }
 
 export default function SpinRevealCard({
@@ -111,8 +125,8 @@ export default function SpinRevealCard({
           <RestaurantPhoto
             photos={restaurant.photos}
             name={restaurant.name}
-            cuisine={cuisine}
             className="h-52 w-full sm:h-60"
+            captionInset
           />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
 

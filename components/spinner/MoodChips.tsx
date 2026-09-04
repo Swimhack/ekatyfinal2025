@@ -34,7 +34,7 @@ export default function MoodChips({
             disabled={disabled}
             aria-pressed={active}
             title={mood.tagline}
-            className={`flex min-h-[44px] items-center gap-2 rounded-full border px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 text-[0.82rem] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 sm:gap-2 sm:px-4 sm:text-sm ${
               active
                 ? 'border-amber-300 bg-amber-300 text-stone-900 shadow-[0_0_24px_rgba(251,191,36,0.45)]'
                 : 'border-white/25 bg-white/10 text-white hover:border-amber-200/70 hover:bg-white/20'

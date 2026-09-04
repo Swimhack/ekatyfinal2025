@@ -54,11 +54,39 @@ function wedgePath(startAngle: number, endAngle: number): string {
   return `M ${CENTER} ${CENTER} L ${start.x} ${start.y} A ${RADIUS} ${RADIUS} 0 ${largeArc} 1 ${end.x} ${end.y} Z`
 }
 
-/** Keeps long restaurant names from overflowing their wedge. */
-function truncate(label: string, max: number): string {
+/**
+ * Fits a restaurant name into the wedge as one or two right-aligned lines.
+ *
+ * Wedges are much wider than they are long, so wrapping onto a second line shows
+ * far more of a name like "Perry's Steakhouse & Grille" than truncating would.
+ */
+function labelLines(label: string, perLine: number): string[] {
   const trimmed = label.trim()
-  if (trimmed.length <= max) return trimmed
-  return `${trimmed.slice(0, max - 1).trimEnd()}…`
+  if (trimmed.length <= perLine) return [trimmed]
+
+  const words = trimmed.split(/\s+/)
+  if (words.length === 1) return [truncate(trimmed, perLine)]
+
+  // Prefer the word boundary that leaves both lines inside the wedge; among
+  // those, the most balanced one.
+  let best: { lines: [string, string]; longest: number } | null = null
+
+  for (let i = 1; i < words.length; i++) {
+    const first = words.slice(0, i).join(' ')
+    const second = words.slice(i).join(' ')
+    const longest = Math.max(first.length, second.length)
+    if (!best || longest < best.longest) best = { lines: [first, second], longest }
+  }
+
+  if (best && best.longest <= perLine) return best.lines
+  if (best) return [truncate(best.lines[0], perLine), truncate(best.lines[1], perLine)]
+
+  return [truncate(trimmed, perLine)]
+}
+
+function truncate(label: string, max: number): string {
+  if (label.length <= max) return label
+  return `${label.slice(0, max - 1).trimEnd()}…`
 }
 
 export default function RouletteWheel({
@@ -83,10 +111,11 @@ export default function RouletteWheel({
   const segmentAngle = 360 / segmentCount
 
   // Label sizing has to react to how crowded the wheel is.
-  const { fontSize, maxChars } = useMemo(() => {
-    if (segmentCount <= 8) return { fontSize: 7, maxChars: 18 }
-    if (segmentCount <= 10) return { fontSize: 6.2, maxChars: 16 }
-    return { fontSize: 5.6, maxChars: 14 }
+  const { fontSize, perLine } = useMemo(() => {
+    if (segmentCount <= 6) return { fontSize: 7, perLine: 15 }
+    if (segmentCount <= 8) return { fontSize: 6.5, perLine: 16 }
+    if (segmentCount <= 10) return { fontSize: 6, perLine: 17 }
+    return { fontSize: 5.4, perLine: 19 }
   }, [segmentCount])
 
   useEffect(() => {
@@ -192,7 +221,11 @@ export default function RouletteWheel({
             const startAngle = index * segmentAngle
             const endAngle = startAngle + segmentAngle
             const midAngle = startAngle + segmentAngle / 2
-            const textAnchorPoint = polarToCartesian(midAngle, RADIUS - 8)
+            const anchor = polarToCartesian(midAngle, RADIUS - 7)
+            const lines = labelLines(segment.label, perLine)
+            // Wedges past the 6 o'clock mark would render their text upside down,
+            // so mirror them and let the label read inward instead.
+            const flipped = midAngle >= 180
 
             return (
               <g key={`${segment.id}-${index}`}>
@@ -203,19 +236,27 @@ export default function RouletteWheel({
                   strokeWidth="0.6"
                 />
                 <text
-                  x={textAnchorPoint.x}
-                  y={textAnchorPoint.y}
+                  x={anchor.x}
+                  y={anchor.y}
                   fill="#fff7ed"
                   fontSize={fontSize}
                   fontWeight={700}
-                  textAnchor="end"
+                  textAnchor={flipped ? 'start' : 'end'}
                   dominantBaseline="middle"
-                  transform={`rotate(${midAngle - 90} ${textAnchorPoint.x} ${textAnchorPoint.y})`}
+                  transform={`rotate(${flipped ? midAngle + 90 : midAngle - 90} ${anchor.x} ${anchor.y})`}
                   style={{ letterSpacing: '0.01em', paintOrder: 'stroke' }}
-                  stroke="rgba(0,0,0,0.35)"
-                  strokeWidth="0.7"
+                  stroke="rgba(0,0,0,0.4)"
+                  strokeWidth="0.75"
                 >
-                  {truncate(segment.label, maxChars)}
+                  {lines.map((line, lineIndex) => (
+                    <tspan
+                      key={line + lineIndex}
+                      x={anchor.x}
+                      dy={lineIndex === 0 ? (lines.length > 1 ? -fontSize * 0.55 : 0) : fontSize * 1.1}
+                    >
+                      {line}
+                    </tspan>
+                  ))}
                 </text>
               </g>
             )

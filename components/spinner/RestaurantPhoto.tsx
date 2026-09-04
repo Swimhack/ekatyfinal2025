@@ -7,6 +7,8 @@ interface RestaurantPhotoProps {
   name: string
   cuisine?: string
   className?: string
+  /** Lifts the placeholder clear of a caption overlay sitting on the image. */
+  captionInset?: boolean
 }
 
 /**
@@ -21,25 +23,42 @@ function isUsableVenuePhoto(url: string | undefined): url is string {
   return !normalized.includes('unsplash.com') && !normalized.includes('pexels.com')
 }
 
-export function PhotoPlaceholder({ name, cuisine }: { name: string; cuisine?: string }) {
+export function PhotoPlaceholder({
+  name,
+  cuisine,
+  captionInset = false,
+}: {
+  name: string
+  cuisine?: string
+  captionInset?: boolean
+}) {
   const initial = name.trim().charAt(0).toUpperCase() || '?'
 
   return (
     <div
-      className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,#7f1d1d,#1c1917_70%)] text-center"
+      className={`flex h-full w-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,#7f1d1d,#1c1917_70%)] text-center ${
+        captionInset ? 'pb-24' : ''
+      }`}
       role="img"
       aria-label={`No photo available for ${name}`}
     >
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-amber-400/70 bg-black/30 text-3xl font-black text-amber-300">
         {initial}
       </div>
-      <p className="px-6 text-sm font-semibold text-amber-100/90">{cuisine || 'Katy, TX'}</p>
-      <p className="text-[0.65rem] uppercase tracking-[0.2em] text-white/45">Photo coming soon</p>
+      <p className="px-6 text-[0.65rem] uppercase tracking-[0.2em] text-white/55">
+        {cuisine || 'Photo coming soon'}
+      </p>
     </div>
   )
 }
 
-export default function RestaurantPhoto({ photos, name, cuisine, className = '' }: RestaurantPhotoProps) {
+export default function RestaurantPhoto({
+  photos,
+  name,
+  cuisine,
+  className = '',
+  captionInset = false,
+}: RestaurantPhotoProps) {
   const candidate = photos.find(isUsableVenuePhoto)
   const [failed, setFailed] = useState(false)
 
@@ -59,7 +78,7 @@ export default function RestaurantPhoto({ photos, name, cuisine, className = '' 
           onError={() => setFailed(true)}
         />
       ) : (
-        <PhotoPlaceholder name={name} cuisine={cuisine} />
+        <PhotoPlaceholder name={name} cuisine={cuisine} captionInset={captionInset} />
       )}
     </div>
   )

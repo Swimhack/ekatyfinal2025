@@ -380,7 +380,7 @@ function SpinnerPageContent() {
         }`}
       />
 
-      <div className="relative mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
+      <div className="relative mx-auto max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pt-10">
         {favoritesOnly && (
           <div className="mb-6 rounded-2xl border border-pink-400/40 bg-pink-500/15 px-4 py-3 text-center">
             <p className="font-semibold">
@@ -392,17 +392,19 @@ function SpinnerPageContent() {
           </div>
         )}
 
-        <header className="mb-7 text-center">
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.35em] text-amber-300/90">eKaty · Katy, TX</p>
+        <header className="mb-5 text-center">
+          <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.35em] text-amber-300/90 sm:text-xs">
+            eKaty · Katy, TX
+          </p>
           <h1 className="text-4xl font-black leading-none sm:text-6xl">
             Grub <span className="text-red-500">Roulette</span>
           </h1>
-          <p className="mx-auto mt-3 max-w-md text-base text-white/70 sm:text-lg">
+          <p className="mx-auto mt-2 max-w-md text-sm text-white/70 sm:mt-3 sm:text-lg">
             {moodTagline || 'Tell us what you\u2019re in the mood for. The wheel handles the rest.'}
           </p>
         </header>
 
-        <div className="mb-6">
+        <div className="mb-5">
           <MoodChips
             activeMoods={activeMoods}
             onToggle={toggleMood}
