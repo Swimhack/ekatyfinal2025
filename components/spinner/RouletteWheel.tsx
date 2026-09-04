@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef } from 'react'
+import { WEDGE_THEMES, WHEEL_CHROME } from '@/lib/spinner/palette'
+import { WHEEL_GEOMETRY, labelMetrics, wrapLabel } from '@/lib/spinner/wheel-labels'
 
 export interface WheelSegment {
   id: string
@@ -21,17 +23,7 @@ interface RouletteWheelProps {
   onTick?: () => void
 }
 
-const VIEWBOX = 200
-const CENTER = VIEWBOX / 2
-const RADIUS = 94
-const HUB_RADIUS = 26
-
-/** Alternating wedge fills, tuned to the eKaty red/amber palette. */
-const WEDGE_FILLS = [
-  '#dc2626', '#f97316', '#b91c1c', '#fb923c',
-  '#991b1b', '#f59e0b', '#ef4444', '#ea580c',
-  '#7f1d1d', '#fbbf24', '#c2410c', '#f87171',
-]
+const { viewBox: VIEWBOX, center: CENTER, radius: RADIUS, hubRadius: HUB_RADIUS } = WHEEL_GEOMETRY
 
 /** Slow start, long glide, gentle landing. */
 function easeOutQuint(t: number): number {
@@ -52,41 +44,6 @@ function wedgePath(startAngle: number, endAngle: number): string {
   const end = polarToCartesian(endAngle, RADIUS)
   const largeArc = endAngle - startAngle > 180 ? 1 : 0
   return `M ${CENTER} ${CENTER} L ${start.x} ${start.y} A ${RADIUS} ${RADIUS} 0 ${largeArc} 1 ${end.x} ${end.y} Z`
-}
-
-/**
- * Fits a restaurant name into the wedge as one or two right-aligned lines.
- *
- * Wedges are much wider than they are long, so wrapping onto a second line shows
- * far more of a name like "Perry's Steakhouse & Grille" than truncating would.
- */
-function labelLines(label: string, perLine: number): string[] {
-  const trimmed = label.trim()
-  if (trimmed.length <= perLine) return [trimmed]
-
-  const words = trimmed.split(/\s+/)
-  if (words.length === 1) return [truncate(trimmed, perLine)]
-
-  // Prefer the word boundary that leaves both lines inside the wedge; among
-  // those, the most balanced one.
-  let best: { lines: [string, string]; longest: number } | null = null
-
-  for (let i = 1; i < words.length; i++) {
-    const first = words.slice(0, i).join(' ')
-    const second = words.slice(i).join(' ')
-    const longest = Math.max(first.length, second.length)
-    if (!best || longest < best.longest) best = { lines: [first, second], longest }
-  }
-
-  if (best && best.longest <= perLine) return best.lines
-  if (best) return [truncate(best.lines[0], perLine), truncate(best.lines[1], perLine)]
-
-  return [truncate(trimmed, perLine)]
-}
-
-function truncate(label: string, max: number): string {
-  if (label.length <= max) return label
-  return `${label.slice(0, max - 1).trimEnd()}…`
 }
 
 export default function RouletteWheel({
@@ -111,12 +68,7 @@ export default function RouletteWheel({
   const segmentAngle = 360 / segmentCount
 
   // Label sizing has to react to how crowded the wheel is.
-  const { fontSize, perLine } = useMemo(() => {
-    if (segmentCount <= 6) return { fontSize: 7, perLine: 15 }
-    if (segmentCount <= 8) return { fontSize: 6.5, perLine: 16 }
-    if (segmentCount <= 10) return { fontSize: 6, perLine: 17 }
-    return { fontSize: 5.4, perLine: 19 }
-  }, [segmentCount])
+  const { fontSize, perLine, maxLines } = useMemo(() => labelMetrics(segmentCount), [segmentCount])
 
   useEffect(() => {
     if (!spinning || targetIndex === null) return
@@ -175,11 +127,11 @@ export default function RouletteWheel({
 
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[min(88vw,30rem)]">
-      {/* Ambient glow that intensifies mid-spin */}
+      {/* Warm stage light on the wheel, lifted mid-spin */}
       <div
         aria-hidden
-        className={`pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(249,115,22,0.55),transparent_68%)] transition-opacity duration-700 ${
-          spinning ? 'opacity-100' : 'opacity-40'
+        className={`pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(207,162,103,0.42),rgba(94,122,78,0.16)_52%,transparent_70%)] transition-opacity duration-700 ${
+          spinning ? 'opacity-100' : 'opacity-45'
         }`}
       />
 
@@ -190,13 +142,19 @@ export default function RouletteWheel({
           spinning && !reducedMotion ? 'animate-pointer-bounce' : ''
         }`}
       >
-        <div className="h-0 w-0 border-l-[13px] border-r-[13px] border-t-[26px] border-l-transparent border-r-transparent border-t-white drop-shadow-[0_3px_6px_rgba(0,0,0,0.55)]" />
-        <div className="mx-auto -mt-[3px] h-2.5 w-2.5 rounded-full bg-white shadow-md" />
+        <div
+          className="h-0 w-0 border-l-[13px] border-r-[13px] border-t-[26px] border-l-transparent border-r-transparent drop-shadow-[0_3px_7px_rgba(0,0,0,0.6)]"
+          style={{ borderTopColor: WHEEL_CHROME.pointer }}
+        />
+        <div
+          className="mx-auto -mt-[3px] h-2.5 w-2.5 rounded-full shadow-md ring-1 ring-charcoal-900/60"
+          style={{ backgroundColor: WHEEL_CHROME.brass }}
+        />
       </div>
 
       <svg
         viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
-        className="relative z-10 h-full w-full drop-shadow-[0_18px_40px_rgba(0,0,0,0.45)]"
+        className="relative z-10 h-full w-full drop-shadow-[0_18px_44px_rgba(12,10,8,0.55)]"
         role="img"
         aria-label={
           segments.length > 0
@@ -204,16 +162,26 @@ export default function RouletteWheel({
             : 'Grub Roulette wheel'
         }
       >
-        {/* Rim */}
-        <circle cx={CENTER} cy={CENTER} r={RADIUS + 5} fill="#1c1917" />
-        <circle cx={CENTER} cy={CENTER} r={RADIUS + 2.5} fill="none" stroke="#fbbf24" strokeWidth="1.5" />
+        {/* Rim: charcoal casing with a brass-honey band */}
+        <circle cx={CENTER} cy={CENTER} r={RADIUS + 6} fill={WHEEL_CHROME.casing} />
+        <circle cx={CENTER} cy={CENTER} r={RADIUS + 3.2} fill="none" stroke={WHEEL_CHROME.brass} strokeWidth="2" />
+        <circle
+          cx={CENTER}
+          cy={CENTER}
+          r={RADIUS + 0.8}
+          fill="none"
+          stroke={WHEEL_CHROME.hairline}
+          strokeWidth="0.7"
+        />
 
         <g
           ref={wheelRef}
           style={{
             transformBox: 'view-box',
             transformOrigin: '50% 50%',
-            filter: spinning && !reducedMotion ? 'blur(0.55px)' : 'none',
+            // A touch of motion blur sells the spin; any more and the names
+            // stop being readable as they pass the pointer.
+            filter: spinning && !reducedMotion ? 'blur(0.35px)' : 'none',
             transition: 'filter 300ms ease-out',
           }}
         >
@@ -221,38 +189,41 @@ export default function RouletteWheel({
             const startAngle = index * segmentAngle
             const endAngle = startAngle + segmentAngle
             const midAngle = startAngle + segmentAngle / 2
-            const anchor = polarToCartesian(midAngle, RADIUS - 7)
-            const lines = labelLines(segment.label, perLine)
+            const anchor = polarToCartesian(midAngle, RADIUS - 6)
+            const lines = wrapLabel(segment.label, perLine, maxLines)
+            const theme = WEDGE_THEMES[index % WEDGE_THEMES.length]
             // Wedges past the 6 o'clock mark would render their text upside down,
             // so mirror them and let the label read inward instead.
             const flipped = midAngle >= 180
+            const lineHeight = fontSize * 1.06
 
             return (
               <g key={`${segment.id}-${index}`}>
                 <path
                   d={wedgePath(startAngle, endAngle)}
-                  fill={WEDGE_FILLS[index % WEDGE_FILLS.length]}
-                  stroke="rgba(255,255,255,0.35)"
-                  strokeWidth="0.6"
+                  fill={theme.fill}
+                  stroke={WHEEL_CHROME.seam}
+                  strokeWidth="0.5"
                 />
                 <text
                   x={anchor.x}
                   y={anchor.y}
-                  fill="#fff7ed"
+                  fill={theme.text}
                   fontSize={fontSize}
-                  fontWeight={700}
+                  fontWeight={800}
                   textAnchor={flipped ? 'start' : 'end'}
                   dominantBaseline="middle"
                   transform={`rotate(${flipped ? midAngle + 90 : midAngle - 90} ${anchor.x} ${anchor.y})`}
-                  style={{ letterSpacing: '0.01em', paintOrder: 'stroke' }}
-                  stroke="rgba(0,0,0,0.4)"
-                  strokeWidth="0.75"
+                  style={{ letterSpacing: '0.005em', paintOrder: 'stroke' }}
+                  stroke={theme.halo}
+                  strokeWidth="0.55"
+                  strokeLinejoin="round"
                 >
                   {lines.map((line, lineIndex) => (
                     <tspan
                       key={line + lineIndex}
                       x={anchor.x}
-                      dy={lineIndex === 0 ? (lines.length > 1 ? -fontSize * 0.55 : 0) : fontSize * 1.1}
+                      dy={lineIndex === 0 ? -((lines.length - 1) / 2) * lineHeight : lineHeight}
                     >
                       {line}
                     </tspan>
@@ -263,17 +234,24 @@ export default function RouletteWheel({
           })}
         </g>
 
-        {/* Hub */}
-        <circle cx={CENTER} cy={CENTER} r={HUB_RADIUS + 3} fill="rgba(28,25,23,0.85)" />
-        <circle cx={CENTER} cy={CENTER} r={HUB_RADIUS} fill="#fffbeb" stroke="#dc2626" strokeWidth="2" />
+        {/* Hub keeps the eKaty red so the brand still owns the centre */}
+        <circle cx={CENTER} cy={CENTER} r={HUB_RADIUS + 3.5} fill="rgba(27,24,21,0.92)" />
+        <circle
+          cx={CENTER}
+          cy={CENTER}
+          r={HUB_RADIUS}
+          fill={WHEEL_CHROME.hubFace}
+          stroke={WHEEL_CHROME.hubRing}
+          strokeWidth="2.2"
+        />
         <text
           x={CENTER}
           y={CENTER - 3}
           textAnchor="middle"
           dominantBaseline="middle"
-          fontSize="8"
+          fontSize="8.4"
           fontWeight={800}
-          fill="#dc2626"
+          fill={WHEEL_CHROME.hubText}
           letterSpacing="0.06em"
         >
           eKaty
@@ -285,7 +263,7 @@ export default function RouletteWheel({
           dominantBaseline="middle"
           fontSize="5"
           fontWeight={700}
-          fill="#78350f"
+          fill={WHEEL_CHROME.hubSubText}
           letterSpacing="0.14em"
         >
           ROULETTE

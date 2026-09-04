@@ -95,7 +95,7 @@ export default function SpinRevealCard({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-end justify-center bg-stone-950/85 p-0 backdrop-blur-sm sm:items-center sm:p-6 ${
+      className={`fixed inset-0 z-50 flex items-end justify-center bg-charcoal-950/85 p-0 backdrop-blur-sm sm:items-center sm:p-6 ${
         reducedMotion ? '' : 'animate-reveal-fade'
       }`}
       role="dialog"
@@ -106,7 +106,7 @@ export default function SpinRevealCard({
       }}
     >
       <div
-        className={`relative flex max-h-[100dvh] w-full max-w-lg flex-col overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-3xl ${
+        className={`relative flex max-h-[100dvh] w-full max-w-lg flex-col overflow-y-auto rounded-t-3xl bg-bone-50 shadow-2xl sm:max-h-[90vh] sm:rounded-3xl ${
           reducedMotion ? '' : 'animate-reveal-rise'
         }`}
       >
@@ -131,7 +131,7 @@ export default function SpinRevealCard({
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
 
           <div className="absolute inset-x-0 bottom-0 p-5">
-            <p className="mb-1 text-[0.7rem] font-bold uppercase tracking-[0.22em] text-amber-300">
+            <p className="mb-1 text-[0.7rem] font-bold uppercase tracking-[0.22em] text-honey-300">
               Spin #{spinNumber} · Tonight you&apos;re eating at
             </p>
             <h2 id="spin-reveal-name" className="text-3xl font-black leading-tight text-white drop-shadow sm:text-4xl">
@@ -143,27 +143,29 @@ export default function SpinRevealCard({
         <div className="flex flex-col gap-4 p-5">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             {cuisine && (
-              <span className="rounded-full bg-red-50 px-3 py-1 font-semibold capitalize text-red-700">{cuisine}</span>
+              <span className="rounded-full bg-sage-100 px-3 py-1 font-semibold capitalize text-sage-700">
+                {cuisine}
+              </span>
             )}
             {price && (
-              <span className="rounded-full bg-stone-100 px-3 py-1 font-semibold text-stone-700">{price}</span>
+              <span className="rounded-full bg-charcoal-100 px-3 py-1 font-semibold text-charcoal-700">{price}</span>
             )}
             {restaurant.rating != null && (
-              <span className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-800">
+              <span className="rounded-full bg-honey-50 px-3 py-1 font-semibold text-honey-800">
                 ★ {restaurant.rating.toFixed(1)}
                 {restaurant.reviewCount > 0 && (
-                  <span className="ml-1 font-normal text-amber-700/80">({restaurant.reviewCount})</span>
+                  <span className="ml-1 font-normal text-honey-700/80">({restaurant.reviewCount})</span>
                 )}
               </span>
             )}
             {restaurant.distance != null && (
-              <span className="rounded-full bg-stone-100 px-3 py-1 font-semibold text-stone-700">
+              <span className="rounded-full bg-charcoal-100 px-3 py-1 font-semibold text-charcoal-700">
                 {restaurant.distance.toFixed(1)} mi away
               </span>
             )}
           </div>
 
-          <p className="text-sm leading-relaxed text-stone-600">
+          <p className="text-sm leading-relaxed text-charcoal-600">
             {restaurant.description
               ? restaurant.description
               : `${restaurant.address}, ${restaurant.city}, ${restaurant.state}`}
@@ -172,7 +174,7 @@ export default function SpinRevealCard({
           <div className="flex flex-col gap-2">
             <Link
               href={`/restaurants/${restaurant.slug || restaurant.id}`}
-              className="flex min-h-[52px] items-center justify-center rounded-xl bg-red-600 px-6 text-base font-bold text-white transition hover:bg-red-700"
+              className="flex min-h-[52px] items-center justify-center rounded-xl bg-primary-700 px-6 text-base font-bold text-bone-50 transition hover:bg-primary-800"
             >
               View listing
             </Link>
@@ -180,13 +182,13 @@ export default function SpinRevealCard({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={onSpinAgain}
-                className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-stone-200 px-4 text-sm font-bold text-stone-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-charcoal-200 px-4 text-sm font-bold text-charcoal-700 transition hover:border-honey-300 hover:bg-honey-50 hover:text-honey-800"
               >
                 <span aria-hidden>🎰</span> Spin again
               </button>
               <button
                 onClick={handleShare}
-                className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-stone-200 px-4 text-sm font-bold text-stone-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-charcoal-200 px-4 text-sm font-bold text-charcoal-700 transition hover:border-honey-300 hover:bg-honey-50 hover:text-honey-800"
               >
                 <span aria-hidden>{copied ? '✅' : '📣'}</span> {copied ? 'Link copied' : 'Share'}
               </button>
@@ -194,9 +196,9 @@ export default function SpinRevealCard({
           </div>
 
           {(restaurant.phone || restaurant.website) && (
-            <div className="flex flex-wrap gap-4 border-t border-stone-100 pt-3 text-sm font-semibold text-stone-500">
+            <div className="flex flex-wrap gap-4 border-t border-charcoal-100 pt-3 text-sm font-semibold text-charcoal-500">
               {restaurant.phone && (
-                <a href={`tel:${restaurant.phone}`} className="hover:text-red-600">
+                <a href={`tel:${restaurant.phone}`} className="hover:text-primary-700">
                   {restaurant.phone}
                 </a>
               )}
@@ -205,7 +207,7 @@ export default function SpinRevealCard({
                   href={restaurant.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-red-600"
+                  className="hover:text-primary-700"
                 >
                   Website
                 </a>
