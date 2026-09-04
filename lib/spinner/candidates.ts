@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
 export interface CandidateFilters {
   /** Cuisine / category labels chosen explicitly by the user. */
@@ -70,10 +70,13 @@ export function buildCandidateWhere(filters: CandidateFilters): Prisma.Restauran
 
   const where: Prisma.RestaurantWhereInput = { active: true }
 
-  if (includeIds.length > 0) {
-    where.id = { in: includeIds }
-  } else if (excludeIds.length > 0) {
-    where.id = { notIn: excludeIds }
+  // Both can apply at once: a "Spin Similar" draw is restricted to the painted
+  // wedges *and* has to keep excluding the listing the user came from.
+  const idFilter: Prisma.StringFilter = {}
+  if (includeIds.length > 0) idFilter.in = includeIds
+  if (excludeIds.length > 0) idFilter.notIn = excludeIds
+  if (idFilter.in || idFilter.notIn) {
+    where.id = idFilter
   }
 
   if (and.length > 0) {

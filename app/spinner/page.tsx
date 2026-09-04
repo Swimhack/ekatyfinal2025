@@ -18,14 +18,24 @@ import {
   termsForMoods,
   type MoodId,
 } from '@/lib/spinner/moods'
+import {
+  SPINNER_CUISINES,
+  deriveSimilarSeed,
+  expandCuisineTerms,
+  matchesCuisines,
+  matchesTerms,
+} from '@/lib/spinner/similar'
 import type { SpinnerRestaurant } from '@/lib/spinner/candidates'
-
-const CUISINES = ['Mexican', 'BBQ', 'Asian', 'American', 'Seafood', 'Indian', 'Italian', 'Breakfast']
 
 /** How long the wheel glides before it settles. */
 const SPIN_DURATION_MS = 4600
-/** Target wedge count; the pool caps it when the directory is thin. */
-const WHEEL_SEGMENTS = 10
+/**
+ * Wedge counts are capped for legibility rather than spectacle: eight names fit
+ * on a desktop wheel at a readable size, six on a phone. The pool caps it
+ * further when the directory is thin.
+ */
+const WHEEL_SEGMENTS = 8
+const WHEEL_SEGMENTS_COMPACT = 6
 const MIN_SEGMENTS = 3
 
 interface Coordinates {
@@ -35,15 +45,32 @@ interface Coordinates {
 
 function fireConfetti() {
   const base = { spread: 78, ticks: 220, gravity: 0.9, scalar: 1.05, zIndex: 60 }
+  const colors = ['#cfa267', '#f7f1e6', '#5e7a4e', '#b91c1c', '#e6d5b6']
 
-  confetti({ ...base, particleCount: 90, origin: { x: 0.5, y: 0.45 } })
-  window.setTimeout(() => confetti({ ...base, particleCount: 55, angle: 60, origin: { x: 0, y: 0.7 } }), 160)
-  window.setTimeout(() => confetti({ ...base, particleCount: 55, angle: 120, origin: { x: 1, y: 0.7 } }), 260)
+  confetti({ ...base, colors, particleCount: 90, origin: { x: 0.5, y: 0.45 } })
+  window.setTimeout(() => confetti({ ...base, colors, particleCount: 55, angle: 60, origin: { x: 0, y: 0.7 } }), 160)
+  window.setTimeout(() => confetti({ ...base, colors, particleCount: 55, angle: 120, origin: { x: 1, y: 0.7 } }), 260)
 }
 
 function SpinnerPageContent() {
   const searchParams = useSearchParams()
   const favoritesOnly = searchParams?.get('favoritesOnly') === 'true'
+
+  // "Spin Similar" arrives from a listing with the referring venue's type in the
+  // URL. `category` seeds the chips, `type` carries a free-text fallback, and
+  // `restaurant` names the venue to leave off the wheel.
+  const categoryParam = searchParams?.get('category') || searchParams?.get('categories') || ''
+  const typeParam = searchParams?.get('type') || searchParams?.get('types') || ''
+  const referrerParam = searchParams?.get('restaurant') || searchParams?.get('exclude') || ''
+  const hasParamSeed = Boolean(categoryParam || typeParam)
+
+  const paramSeed = useMemo(
+    () =>
+      hasParamSeed
+        ? deriveSimilarSeed({ categories: categoryParam, cuisineTypes: typeParam })
+        : { cuisines: [], terms: [], label: '' },
+    [hasParamSeed, categoryParam, typeParam]
+  )
 
   const prefersReducedMotion = usePrefersReducedMotion()
 
@@ -51,6 +78,7 @@ function SpinnerPageContent() {
   const [poolTotal, setPoolTotal] = useState(0)
   const [poolLoading, setPoolLoading] = useState(true)
   const [segments, setSegments] = useState<SpinnerRestaurant[]>([])
+  const [maxSegments, setMaxSegments] = useState(WHEEL_SEGMENTS)
 
   const [isSpinning, setIsSpinning] = useState(false)
   const [targetIndex, setTargetIndex] = useState<number | null>(null)
@@ -61,12 +89,20 @@ function SpinnerPageContent() {
   const [history, setHistory] = useState<SpinnerRestaurant[]>([])
 
   const [activeMoods, setActiveMoods] = useState<MoodId[]>([])
-  const [selectedCuisines, setSelectedCuisines] = useState<string[]>([])
+  const [selectedCuisines, setSelectedCuisines] = useState<string[]>(() => paramSeed.cuisines)
+  const [similarTerms, setSimilarTerms] = useState<string[]>(() => paramSeed.terms)
   const [selectedPriceLevel, setSelectedPriceLevel] = useState<string | null>(null)
   const [radius, setRadius] = useState(5)
   const [coords, setCoords] = useState<Coordinates | null>(null)
   const [geoPending, setGeoPending] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+
+  // Referring listing: resolved so we can exclude it and name it in the banner.
+  const [referrer, setReferrer] = useState<{ id: string; name: string } | null>(null)
+  const [seedPending, setSeedPending] = useState(() => Boolean(referrerParam) && !hasParamSeed)
+  const [seedUnmapped, setSeedUnmapped] = useState(
+    () => hasParamSeed && paramSeed.cuisines.length === 0 && paramSeed.terms.length === 0
+  )
 
   const [soundEnabled, setSoundEnabled] = useState(true)
   const spinSound = useSound('/sounds/spin.mp3', { volume: 0.4 })
@@ -81,6 +117,18 @@ function SpinnerPageContent() {
     setGeoAvailable(typeof navigator !== 'undefined' && 'geolocation' in navigator)
   }, [])
 
+  // Narrow screens get fewer, bigger wedges so the names stay readable.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+
+    const query = window.matchMedia('(max-width: 480px)')
+    const apply = () => setMaxSegments(query.matches ? WHEEL_SEGMENTS_COMPACT : WHEEL_SEGMENTS)
+
+    apply()
+    query.addEventListener?.('change', apply)
+    return () => query.removeEventListener?.('change', apply)
+  }, [])
+
   const moodTerms = useMemo(() => termsForMoods(activeMoods), [activeMoods])
   const moodPriceLevels = useMemo(() => priceLevelsForMoods(activeMoods), [activeMoods])
   const priceLevels = useMemo(
@@ -89,8 +137,27 @@ function SpinnerPageContent() {
   )
   const nearMeActive = activeMoods.includes('near-me')
 
+  /**
+   * The cuisine group sent to the API. Chips are expanded into their aliases so
+   * a "Mexican" spin also reaches rows tagged `taqueria` or `mexican_restaurant`.
+   */
+  const cuisineQueryTerms = useMemo(
+    () => [...expandCuisineTerms(selectedCuisines), ...similarTerms],
+    [selectedCuisines, similarTerms]
+  )
+
+  const excludedIds = useMemo(() => {
+    const ids = new Set<string>()
+    if (referrerParam) ids.add(referrerParam)
+    if (referrer?.id) ids.add(referrer.id)
+    return Array.from(ids)
+  }, [referrerParam, referrer])
+
   const activeFilterCount =
-    selectedCuisines.length + (selectedPriceLevel ? 1 : 0) + activeMoods.filter(id => id !== 'surprise').length
+    selectedCuisines.length +
+    (similarTerms.length > 0 ? 1 : 0) +
+    (selectedPriceLevel ? 1 : 0) +
+    activeMoods.filter(id => id !== 'surprise').length
 
   useEffect(() => {
     if (!favoritesOnly) return
@@ -115,23 +182,73 @@ function SpinnerPageContent() {
     }
   }, [favoritesOnly])
 
+  /**
+   * Resolves the referring listing. Links that already carry `category` only
+   * need its name for the banner; legacy `?restaurant=<id>` links also have to
+   * derive the cuisine from the row before the first pool load.
+   */
+  useEffect(() => {
+    if (!referrerParam) return
+
+    let cancelled = false
+
+    fetch(`/api/restaurants/${encodeURIComponent(referrerParam)}`)
+      .then(response => (response.ok ? response.json() : null))
+      .then(data => {
+        if (cancelled) return
+
+        if (data?.id) setReferrer({ id: data.id, name: data.name })
+
+        if (!hasParamSeed) {
+          const seed = data ? deriveSimilarSeed(data) : { cuisines: [], terms: [], label: '' }
+          if (seed.cuisines.length > 0) setSelectedCuisines(seed.cuisines)
+          else if (seed.terms.length > 0) setSimilarTerms(seed.terms)
+          else setSeedUnmapped(true)
+        }
+
+        setSeedPending(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        // Never trap the user on a dead spinner: fall back to the full directory.
+        if (!hasParamSeed) setSeedUnmapped(true)
+        setSeedPending(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [referrerParam, hasParamSeed])
+
   /** Favourites mode filters in the browser; everything else asks the API. */
   const favoritesPool = useMemo(() => {
     if (!favoritesOnly) return []
 
     return favorites.filter(restaurant => {
-      const haystack = [restaurant.name, ...restaurant.categories, ...restaurant.cuisineTypes]
-        .join(' ')
-        .toLowerCase()
+      if (excludedIds.includes(restaurant.id)) return false
+      if (!matchesCuisines(restaurant, selectedCuisines)) return false
+      if (!matchesTerms(restaurant, similarTerms)) return false
 
-      if (selectedCuisines.length > 0 && !selectedCuisines.some(c => haystack.includes(c.toLowerCase()))) return false
-      if (moodTerms.length > 0 && !moodTerms.some(term => haystack.includes(term))) return false
+      if (moodTerms.length > 0) {
+        const haystack = [restaurant.name, ...restaurant.categories, ...restaurant.cuisineTypes]
+          .join(' ')
+          .toLowerCase()
+        if (!moodTerms.some(term => haystack.includes(term))) return false
+      }
+
       if (priceLevels.length > 0 && !priceLevels.includes(restaurant.priceLevel)) return false
       return true
     })
-  }, [favoritesOnly, favorites, selectedCuisines, moodTerms, priceLevels])
+  }, [favoritesOnly, favorites, excludedIds, selectedCuisines, similarTerms, moodTerms, priceLevels])
 
   const loadPool = useCallback(async () => {
+    // Legacy "Spin Similar" links have to resolve their cuisine first, otherwise
+    // the wheel would flash an unfiltered directory draw.
+    if (seedPending) {
+      setPoolLoading(true)
+      return
+    }
+
     if (favoritesOnly) {
       setPool(favoritesPool)
       setPoolTotal(favoritesPool.length)
@@ -142,9 +259,10 @@ function SpinnerPageContent() {
     setPoolLoading(true)
 
     const params = new URLSearchParams()
-    if (selectedCuisines.length > 0) params.set('categories', selectedCuisines.join(','))
+    if (cuisineQueryTerms.length > 0) params.set('categories', cuisineQueryTerms.join(','))
     if (moodTerms.length > 0) params.set('terms', moodTerms.join(','))
     if (priceLevels.length > 0) params.set('priceLevels', priceLevels.join(','))
+    if (excludedIds.length > 0) params.set('excludeIds', excludedIds.join(','))
     if (nearMeActive && coords) {
       params.set('lat', String(coords.lat))
       params.set('lng', String(coords.lng))
@@ -167,7 +285,18 @@ function SpinnerPageContent() {
     } finally {
       setPoolLoading(false)
     }
-  }, [favoritesOnly, favoritesPool, selectedCuisines, moodTerms, priceLevels, nearMeActive, coords, radius])
+  }, [
+    seedPending,
+    favoritesOnly,
+    favoritesPool,
+    cuisineQueryTerms,
+    moodTerms,
+    priceLevels,
+    excludedIds,
+    nearMeActive,
+    coords,
+    radius,
+  ])
 
   useEffect(() => {
     void loadPool()
@@ -178,12 +307,13 @@ function SpinnerPageContent() {
   useEffect(() => {
     if (isSpinning || result) return
 
+    const candidates = pool.filter(restaurant => !excludedIds.includes(restaurant.id))
     const recentIds = new Set(history.slice(0, 3).map(item => item.id))
-    const fresh = pool.filter(restaurant => !recentIds.has(restaurant.id))
-    const source = fresh.length >= MIN_SEGMENTS ? fresh : pool
+    const fresh = candidates.filter(restaurant => !recentIds.has(restaurant.id))
+    const source = fresh.length >= MIN_SEGMENTS ? fresh : candidates
 
-    setSegments(source.slice(0, WHEEL_SEGMENTS))
-  }, [pool, history, isSpinning, result])
+    setSegments(source.slice(0, maxSegments))
+  }, [pool, history, isSpinning, result, excludedIds, maxSegments])
 
   const wheelSegments: WheelSegment[] = useMemo(
     () => segments.map(restaurant => ({ id: restaurant.id, label: restaurant.name })),
@@ -216,6 +346,7 @@ function SpinnerPageContent() {
       if (mood?.clearsFilters) {
         setActiveMoods([])
         setSelectedCuisines([])
+        setSimilarTerms([])
         setSelectedPriceLevel(null)
         return
       }
@@ -231,14 +362,23 @@ function SpinnerPageContent() {
   )
 
   const toggleCuisine = (cuisine: string) => {
+    // Once the user picks a chip, the free-text seed has done its job.
+    setSimilarTerms([])
     setSelectedCuisines(current =>
       current.includes(cuisine) ? current.filter(c => c !== cuisine) : [...current, cuisine]
     )
   }
 
+  const clearSimilarSeed = () => {
+    setSelectedCuisines([])
+    setSimilarTerms([])
+    setError(null)
+  }
+
   const resetFilters = () => {
     setActiveMoods([])
     setSelectedCuisines([])
+    setSimilarTerms([])
     setSelectedPriceLevel(null)
     setRadius(5)
     setError(null)
@@ -269,7 +409,8 @@ function SpinnerPageContent() {
             // Restricting to the painted wedges is what lets the wheel physically
             // land on the winner instead of faking the stop.
             includeIds: segments.map(segment => segment.id),
-            categories: selectedCuisines,
+            excludeIds: excludedIds,
+            categories: cuisineQueryTerms,
             terms: moodTerms,
             priceLevels,
             radius,
@@ -315,7 +456,8 @@ function SpinnerPageContent() {
     isSpinning,
     segments,
     favoritesOnly,
-    selectedCuisines,
+    excludedIds,
+    cuisineQueryTerms,
     moodTerms,
     priceLevels,
     radius,
@@ -360,6 +502,9 @@ function SpinnerPageContent() {
 
   const moodTagline = activeMoods.length > 0 ? MOODS_BY_ID[activeMoods[activeMoods.length - 1]]?.tagline : null
 
+  const seededFromListing = Boolean(referrerParam || hasParamSeed)
+  const seedLabel = selectedCuisines.length > 0 ? selectedCuisines.join(' · ') : similarTerms.join(' · ')
+
   const poolSummary = poolLoading
     ? 'Shuffling the deck…'
     : poolTotal === 0
@@ -367,39 +512,71 @@ function SpinnerPageContent() {
       : `${poolTotal} Katy restaurant${poolTotal === 1 ? '' : 's'} in play · ${segments.length} on the wheel`
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-stone-950 text-white">
-      {/* Ambient stage lighting */}
+    <div className="spinner-stage relative min-h-screen overflow-hidden text-bone-100">
+      {/* Reclaimed-wood battens behind the stage lighting */}
+      <div aria-hidden className="spinner-battens pointer-events-none absolute inset-0" />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(220,38,38,0.35),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(249,115,22,0.22),transparent_60%)]"
-      />
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute inset-0 bg-stone-950/60 transition-opacity duration-700 ${
+        className={`pointer-events-none absolute inset-0 bg-charcoal-950/55 transition-opacity duration-700 ${
           isSpinning ? 'opacity-100' : 'opacity-0'
         }`}
       />
 
       <div className="relative mx-auto max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pt-10">
         {favoritesOnly && (
-          <div className="mb-6 rounded-2xl border border-pink-400/40 bg-pink-500/15 px-4 py-3 text-center">
+          <div className="mb-6 rounded-2xl border border-honey-400/35 bg-honey-900/35 px-4 py-3 text-center">
             <p className="font-semibold">
               ❤️ Spinning from your {favorites.length} favourite{favorites.length === 1 ? '' : 's'}
             </p>
-            <Link href="/spinner" className="text-sm text-pink-200 underline hover:no-underline">
+            <Link href="/spinner" className="text-sm text-honey-200 underline hover:no-underline">
               Spin the whole directory instead
             </Link>
           </div>
         )}
 
+        {seededFromListing && (
+          <div className="mb-6 flex flex-col items-center gap-1 rounded-2xl border border-sage-400/35 bg-sage-800/45 px-4 py-3 text-center">
+            {seedLabel ? (
+              <p className="font-semibold">
+                <span aria-hidden className="mr-1.5">
+                  🎯
+                </span>
+                {referrer
+                  ? `Spinning similar to ${referrer.name}`
+                  : `Spinning similar to ${seedLabel}`}
+                {referrer && <span className="text-bone-100/70"> · {seedLabel}</span>}
+              </p>
+            ) : (
+              <p className="font-semibold">
+                <span aria-hidden className="mr-1.5">
+                  🤠
+                </span>
+                {seedUnmapped
+                  ? `We could not pin down what ${referrer?.name || 'that spot'} serves, so all of Katy is in play`
+                  : 'Loading what that spot serves…'}
+              </p>
+            )}
+            <p className="text-sm text-bone-100/70">
+              Pick a mood or cuisine to steer it, or{' '}
+              <button
+                onClick={clearSimilarSeed}
+                className="font-semibold text-honey-200 underline hover:no-underline"
+              >
+                spin the whole directory
+              </button>
+              .
+            </p>
+          </div>
+        )}
+
         <header className="mb-5 text-center">
-          <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.35em] text-amber-300/90 sm:text-xs">
+          <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.35em] text-honey-300 sm:text-xs">
             eKaty · Katy, TX
           </p>
           <h1 className="text-4xl font-black leading-none sm:text-6xl">
-            Grub <span className="text-red-500">Roulette</span>
+            Grub <span className="text-primary-500">Roulette</span>
           </h1>
-          <p className="mx-auto mt-2 max-w-md text-sm text-white/70 sm:mt-3 sm:text-lg">
+          <p className="mx-auto mt-2 max-w-md text-sm text-bone-100/70 sm:mt-3 sm:text-lg">
             {moodTagline || 'Tell us what you\u2019re in the mood for. The wheel handles the rest.'}
           </p>
         </header>
@@ -417,18 +594,18 @@ function SpinnerPageContent() {
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
           <div className="flex flex-col items-center">
             {poolLoading && segments.length === 0 ? (
-              <div className="flex aspect-square w-full max-w-[min(88vw,30rem)] items-center justify-center rounded-full border border-white/10 bg-white/5">
-                <p className="animate-pulse text-sm font-semibold text-white/60">Loading the wheel…</p>
+              <div className="flex aspect-square w-full max-w-[min(88vw,30rem)] items-center justify-center rounded-full border border-honey-500/20 bg-charcoal-800/60">
+                <p className="animate-pulse text-sm font-semibold text-bone-100/60">Loading the wheel…</p>
               </div>
             ) : segments.length === 0 ? (
-              <div className="flex aspect-square w-full max-w-[min(88vw,30rem)] flex-col items-center justify-center gap-3 rounded-full border border-white/10 bg-white/5 px-10 text-center">
+              <div className="flex aspect-square w-full max-w-[min(88vw,30rem)] flex-col items-center justify-center gap-3 rounded-full border border-honey-500/20 bg-charcoal-800/60 px-10 text-center">
                 <span className="text-4xl" aria-hidden>
                   🫙
                 </span>
-                <p className="text-sm font-semibold text-white/70">
+                <p className="text-sm font-semibold text-bone-100/70">
                   No Katy restaurants match that combination yet.
                 </p>
-                <button onClick={resetFilters} className="text-sm font-bold text-amber-300 underline">
+                <button onClick={resetFilters} className="text-sm font-bold text-honey-300 underline">
                   Clear filters
                 </button>
               </div>
@@ -444,7 +621,7 @@ function SpinnerPageContent() {
               />
             )}
 
-            <p className="mt-5 text-center text-sm font-medium text-white/55" aria-live="polite">
+            <p className="mt-5 text-center text-sm font-medium text-bone-100/60" aria-live="polite">
               {poolSummary}
             </p>
 
@@ -453,14 +630,14 @@ function SpinnerPageContent() {
               disabled={isSpinning || segments.length < 2}
               className={`mt-4 min-h-[60px] w-full max-w-sm rounded-2xl px-10 text-xl font-black uppercase tracking-wide transition-all ${
                 isSpinning || segments.length < 2
-                  ? 'cursor-not-allowed bg-white/15 text-white/45'
-                  : 'bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-[0_10px_40px_-8px_rgba(239,68,68,0.85)] hover:brightness-110 active:scale-[0.98]'
+                  ? 'cursor-not-allowed bg-charcoal-700/70 text-bone-100/40'
+                  : 'bg-gradient-to-r from-primary-800 to-primary-600 text-bone-50 shadow-[0_12px_34px_-10px_rgba(153,27,27,0.85)] hover:brightness-110 active:scale-[0.98]'
               } ${isSpinning || prefersReducedMotion || segments.length < 2 ? '' : 'animate-spin-cta-pulse'}`}
             >
               {isSpinning ? 'Spinning…' : result ? 'Spin again' : 'Spin the wheel'}
             </button>
 
-            <p className="mt-3 text-center text-xs text-white/40">
+            <p className="mt-3 text-center text-xs text-bone-100/45">
               {spinCount > 0
                 ? `${spinCount} spin${spinCount === 1 ? '' : 's'} this session`
                 : 'Every wedge is a real Katy listing.'}
@@ -469,7 +646,7 @@ function SpinnerPageContent() {
             {error && (
               <div
                 role="alert"
-                className="mt-4 w-full max-w-sm rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-3 text-center text-sm font-medium text-red-100"
+                className="mt-4 w-full max-w-sm rounded-xl border border-primary-400/40 bg-primary-900/40 px-4 py-3 text-center text-sm font-medium text-primary-100"
               >
                 {error}
               </div>
@@ -477,16 +654,16 @@ function SpinnerPageContent() {
           </div>
 
           <aside className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+            <div className="rounded-2xl border border-honey-500/20 bg-charcoal-800/70 p-4 backdrop-blur">
               <button
                 onClick={() => setShowFilters(current => !current)}
                 aria-expanded={showFilters}
-                className="flex w-full items-center justify-between text-left text-sm font-bold uppercase tracking-wider text-white/80 lg:cursor-default"
+                className="flex w-full items-center justify-between text-left text-sm font-bold uppercase tracking-wider text-bone-100/80 lg:cursor-default"
               >
                 <span>
                   Fine tune
                   {activeFilterCount > 0 && (
-                    <span className="ml-2 rounded-full bg-amber-300 px-2 py-0.5 text-xs font-black text-stone-900">
+                    <span className="ml-2 rounded-full bg-honey-300 px-2 py-0.5 text-xs font-black text-charcoal-900">
                       {activeFilterCount}
                     </span>
                   )}
@@ -498,9 +675,9 @@ function SpinnerPageContent() {
 
               <div className={`${showFilters ? 'block' : 'hidden'} mt-4 space-y-5 lg:block`}>
                 <div>
-                  <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">Cuisine</h3>
+                  <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-bone-100/55">Cuisine</h3>
                   <div className="flex flex-wrap gap-2">
-                    {CUISINES.map(cuisine => (
+                    {SPINNER_CUISINES.map(cuisine => (
                       <button
                         key={cuisine}
                         onClick={() => toggleCuisine(cuisine)}
@@ -508,18 +685,26 @@ function SpinnerPageContent() {
                         aria-pressed={selectedCuisines.includes(cuisine)}
                         className={`min-h-[36px] rounded-full px-3 text-sm font-semibold transition disabled:opacity-50 ${
                           selectedCuisines.includes(cuisine)
-                            ? 'bg-red-600 text-white'
-                            : 'bg-white/10 text-white/80 hover:bg-white/20'
+                            ? 'bg-sage-600 text-bone-50 shadow-[0_0_0_1px_rgba(207,162,103,0.45)]'
+                            : 'bg-charcoal-700/70 text-bone-100/80 hover:bg-charcoal-600'
                         }`}
                       >
                         {cuisine}
                       </button>
                     ))}
                   </div>
+
+                  {similarTerms.length > 0 && (
+                    <p className="mt-2 text-xs text-bone-100/60">
+                      Matching{' '}
+                      <span className="font-semibold capitalize text-honey-200">{similarTerms.join(', ')}</span> from
+                      the listing you came from.
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">Budget</h3>
+                  <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-bone-100/55">Budget</h3>
                   <div className="grid grid-cols-4 gap-2">
                     {PRICE_LEVELS.map(level => (
                       <button
@@ -531,8 +716,8 @@ function SpinnerPageContent() {
                         aria-pressed={selectedPriceLevel === level.value}
                         className={`min-h-[48px] rounded-lg text-center transition disabled:opacity-50 ${
                           selectedPriceLevel === level.value
-                            ? 'bg-amber-300 text-stone-900'
-                            : 'bg-white/10 text-white/80 hover:bg-white/20'
+                            ? 'bg-honey-300 text-charcoal-900'
+                            : 'bg-charcoal-700/70 text-bone-100/80 hover:bg-charcoal-600'
                         }`}
                       >
                         <span className="block text-sm font-black">{level.label}</span>
@@ -546,7 +731,7 @@ function SpinnerPageContent() {
 
                 {nearMeActive && coords && (
                   <div>
-                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-bone-100/55">
                       Within {radius} miles
                     </h3>
                     <input
@@ -557,22 +742,25 @@ function SpinnerPageContent() {
                       onChange={event => setRadius(parseInt(event.target.value, 10))}
                       disabled={isSpinning}
                       aria-label="Maximum distance in miles"
-                      className="w-full accent-red-500"
+                      className="w-full accent-sage-500"
                     />
                   </div>
                 )}
 
-                <div className="flex items-center justify-between border-t border-white/10 pt-4">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-white/75">
+                <div className="flex items-center justify-between border-t border-honey-500/15 pt-4">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-bone-100/75">
                     <input
                       type="checkbox"
                       checked={soundEnabled}
                       onChange={event => setSoundEnabled(event.target.checked)}
-                      className="h-4 w-4 rounded border-white/30 accent-red-500"
+                      className="h-4 w-4 rounded border-bone-100/30 accent-primary-600"
                     />
                     {soundEnabled ? '🔊' : '🔇'} Sound
                   </label>
-                  <button onClick={resetFilters} className="text-sm font-semibold text-white/50 hover:text-white">
+                  <button
+                    onClick={resetFilters}
+                    className="text-sm font-semibold text-bone-100/55 hover:text-bone-50"
+                  >
                     Reset
                   </button>
                 </div>
@@ -580,17 +768,19 @@ function SpinnerPageContent() {
             </div>
 
             {history.length > 0 && (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-                <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-white/50">Recent spins</h2>
+              <div className="rounded-2xl border border-honey-500/20 bg-charcoal-800/70 p-4 backdrop-blur">
+                <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-bone-100/55">Recent spins</h2>
                 <ul className="space-y-2">
                   {history.map((restaurant, index) => (
                     <li key={`${restaurant.id}-${index}`}>
                       <Link
                         href={`/restaurants/${restaurant.slug || restaurant.id}`}
-                        className="flex items-center justify-between gap-3 text-sm text-white/75 transition hover:text-amber-300"
+                        className="flex items-center justify-between gap-3 text-sm text-bone-100/75 transition hover:text-honey-300"
                       >
                         <span className="truncate">{restaurant.name}</span>
-                        <span className="shrink-0 text-xs text-white/40">{priceSymbol(restaurant.priceLevel)}</span>
+                        <span className="shrink-0 text-xs text-bone-100/45">
+                          {priceSymbol(restaurant.priceLevel)}
+                        </span>
                       </Link>
                     </li>
                   ))}
@@ -598,9 +788,9 @@ function SpinnerPageContent() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60 backdrop-blur">
-              <p className="mb-2 font-semibold text-white/80">Not feeling lucky?</p>
-              <Link href="/discover" className="font-semibold text-amber-300 hover:underline">
+            <div className="rounded-2xl border border-honey-500/20 bg-charcoal-800/70 p-4 text-sm text-bone-100/65 backdrop-blur">
+              <p className="mb-2 font-semibold text-bone-100/85">Not feeling lucky?</p>
+              <Link href="/discover" className="font-semibold text-honey-300 hover:underline">
                 Browse the full Katy directory →
               </Link>
             </div>
@@ -643,7 +833,7 @@ export default function SpinnerPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-stone-950 text-white">
+        <div className="spinner-stage flex min-h-screen items-center justify-center text-bone-100">
           <p className="animate-pulse text-lg font-semibold">Warming up the wheel…</p>
         </div>
       }
