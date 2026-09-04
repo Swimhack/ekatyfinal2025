@@ -1,6 +1,10 @@
 /**
  * Bounded restaurant photo audit shared by CLI and admin API.
- * Clears only invalid, inaccessible, logo/favicon, or known-stock URLs.
+ * Clears only invalid, inaccessible, logo/favicon, brand-marketing, or
+ * known-stock URLs, across `photos`, `logoUrl` and `metadata.heroImage`.
+ *
+ * Every committed change writes the previous values to `metadata.photoAudit`
+ * under `restore`, so a run can be undone from the rows it touched.
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -16,6 +20,9 @@ export interface PhotoAuditRowReport {
   before: string[]
   after: string[]
   removed: Array<{ url: string; reason: ChangeReason }>
+  /** Set when the row's logo was brand artwork rather than a venue photo. */
+  clearedLogoUrl?: { url: string; reason: ChangeReason }
+  clearedHeroImage?: { url: string; reason: ChangeReason }
   changed: boolean
 }
 
@@ -24,6 +31,8 @@ export interface PhotoAuditSummary {
   scanned: number
   changed: number
   skippedAdminOverride: number
+  logoUrlsCleared: number
+  heroImagesCleared: number
   reasonCounts: Record<string, number>
   sourceCounts: Record<string, number>
   samples: Array<{
@@ -43,6 +52,13 @@ export interface RunPhotoAuditOptions {
   limit?: number
   checkReachability?: boolean
   prisma?: PrismaClient
+  /**
+   * Restrict removals to these rejection reasons, leaving anything else in
+   * place. Lets a targeted cleanup — say, only brand marketing — run without
+   * also acting on the reachability checks, which depend on the network being
+   * healthy at the moment the script runs.
+   */
+  onlyReasons?: PhotoRejectReason[]
 }
 
 async function urlReachable(url: string): Promise<boolean> {
@@ -81,6 +97,8 @@ export async function runPhotoAudit(
   const checkReachability = options.checkReachability !== false
   const prisma = options.prisma || new PrismaClient()
   const ownsClient = !options.prisma
+  const onlyReasons = options.onlyReasons?.length ? new Set(options.onlyReasons) : null
+  const actOn = (reason: PhotoRejectReason) => !onlyReasons || onlyReasons.has(reason)
 
   try {
     const restaurants = await prisma.restaurant.findMany({
@@ -90,6 +108,7 @@ export async function runPhotoAudit(
         name: true,
         source: true,
         photos: true,
+        logoUrl: true,
         metadata: true,
         adminOverrides: true,
       },
@@ -101,6 +120,8 @@ export async function runPhotoAudit(
     const reasonCounts: Record<string, number> = {}
     const sourceCounts: Record<string, number> = {}
     let skippedAdminOverride = 0
+    let logoUrlsCleared = 0
+    let heroImagesCleared = 0
 
     for (const row of restaurants) {
       let overrides: Record<string, boolean> = {}
@@ -121,13 +142,15 @@ export async function runPhotoAudit(
       for (const url of before) {
         const assessment = assessPhotoUrl(url)
         if (!assessment.ok) {
-          removed.push({ url, reason: assessment.reason || 'invalid_url' })
-          reasonCounts[assessment.reason || 'invalid_url'] =
-            (reasonCounts[assessment.reason || 'invalid_url'] || 0) + 1
-          continue
+          const reason = assessment.reason || 'invalid_url'
+          if (actOn(reason)) {
+            removed.push({ url, reason })
+            reasonCounts[reason] = (reasonCounts[reason] || 0) + 1
+            continue
+          }
         }
 
-        if (checkReachability) {
+        if (checkReachability && actOn('unreachable')) {
           const ok = await urlReachable(url)
           if (!ok) {
             removed.push({ url, reason: 'unreachable' })
@@ -139,6 +162,41 @@ export async function runPhotoAudit(
         after.push(url)
       }
 
+      /**
+       * logoUrl and metadata.heroImage are the other two fields a card can draw
+       * from, so a brand tile cleared out of `photos` alone would still reach
+       * the page through one of them.
+       */
+      let metadata: Record<string, unknown> = {}
+      try {
+        metadata = row.metadata ? JSON.parse(row.metadata) : {}
+      } catch {
+        metadata = {}
+      }
+
+      let clearedLogoUrl: PhotoAuditRowReport['clearedLogoUrl']
+      if (row.logoUrl) {
+        const assessment = assessPhotoUrl(row.logoUrl)
+        const reason = assessment.reason || 'invalid_url'
+        if (!assessment.ok && actOn(reason)) {
+          clearedLogoUrl = { url: row.logoUrl, reason }
+          reasonCounts[reason] = (reasonCounts[reason] || 0) + 1
+          logoUrlsCleared += 1
+        }
+      }
+
+      const heroImage = typeof metadata.heroImage === 'string' ? metadata.heroImage : null
+      let clearedHeroImage: PhotoAuditRowReport['clearedHeroImage']
+      if (heroImage) {
+        const assessment = assessPhotoUrl(heroImage)
+        const reason = assessment.reason || 'invalid_url'
+        if (!assessment.ok && actOn(reason)) {
+          clearedHeroImage = { url: heroImage, reason }
+          reasonCounts[reason] = (reasonCounts[reason] || 0) + 1
+          heroImagesCleared += 1
+        }
+      }
+
       const beforeSerialized = row.photos || ''
       const afterSerialized = serializePhotos(after)
       const reassembled =
@@ -147,7 +205,8 @@ export async function runPhotoAudit(
         beforeSerialized !== afterSerialized &&
         after.length > 0
 
-      const changed = beforeSerialized !== afterSerialized
+      const changed =
+        beforeSerialized !== afterSerialized || !!clearedLogoUrl || !!clearedHeroImage
       if (changed) {
         sourceCounts[row.source || 'unknown'] =
           (sourceCounts[row.source || 'unknown'] || 0) + 1
@@ -163,26 +222,32 @@ export async function runPhotoAudit(
         before,
         after,
         removed,
+        clearedLogoUrl,
+        clearedHeroImage,
         changed,
       })
 
       if (commit && changed) {
-        let metadata: Record<string, unknown> = {}
-        try {
-          metadata = row.metadata ? JSON.parse(row.metadata) : {}
-        } catch {
-          metadata = {}
-        }
+        if (clearedHeroImage) delete metadata.heroImage
         metadata.photoAudit = {
           at: new Date().toISOString(),
           removed: removed.map((r) => ({ url: r.url, reason: r.reason })),
           kept: after.length,
+          clearedLogoUrl: clearedLogoUrl || null,
+          clearedHeroImage: clearedHeroImage || null,
+          // Enough to put the row back exactly as it was.
+          restore: {
+            photos: beforeSerialized,
+            logoUrl: clearedLogoUrl ? clearedLogoUrl.url : null,
+            heroImage: clearedHeroImage ? clearedHeroImage.url : null,
+          },
         }
 
         await prisma.restaurant.update({
           where: { id: row.id },
           data: {
             photos: afterSerialized,
+            ...(clearedLogoUrl ? { logoUrl: null } : {}),
             metadata: JSON.stringify(metadata),
           },
         })
@@ -195,6 +260,8 @@ export async function runPhotoAudit(
       scanned: restaurants.length,
       changed: changedRows.length,
       skippedAdminOverride,
+      logoUrlsCleared,
+      heroImagesCleared,
       reasonCounts,
       sourceCounts,
       samples: changedRows.slice(0, 25).map((r) => ({
