@@ -71,7 +71,9 @@ export default function EditRestaurantPage() {
           photos: data.photos || ''
         })
         setLogoPreview(data.logoUrl || '')
-        setHeroImagePreview(data.heroImage || '')
+        // Preview what the public page currently shows, which may be a photo
+        // fallback rather than a saved hero.
+        setHeroImagePreview(data.heroImage || data.displayImage || '')
         console.log('Set hero image preview to:', data.heroImage)
         if (data.photos) {
           const photosArray = data.photos.split(',').filter(Boolean)
