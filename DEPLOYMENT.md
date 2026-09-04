@@ -486,6 +486,27 @@ Visit [https://fly.io/apps/ekaty/monitoring](https://fly.io/apps/ekaty/monitorin
 3. Ensure all dependencies are in package.json
 4. Check Fly.io build logs
 
+### Image Uploads
+
+Admin hero/logo/photo uploads and user profile images go to Cloudflare R2 when
+`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` are set, and
+otherwise to local disk under `public/uploads/`.
+
+- Local writes need the app directory to be writable by the Node process. Set
+  `UPLOADS_DIR` to point at a writable path (for example a mounted volume) if it
+  is not.
+- `output: 'standalone'` serves static assets from `.next/standalone/public`, so
+  uploads are written to both that tree and `public/`. A file that only exists in
+  one of them is still served: `/uploads/*` falls through to a route handler that
+  reads from either location.
+- Heroes cap at 5MB and profile images at 2MB in the API, and the framework body
+  limit is 10mb. A reverse proxy needs a matching `client_max_body_size` (at
+  least `10m`) or it rejects the upload with a 413 HTML page before Next sees it.
+- A restaurant's primary image is resolved as
+  `metadata.heroImage → metadata.profileImageUrl → photos[0] → logoUrl`, and
+  saving a hero writes all of the first two plus `photos[0]`. Keep new code going
+  through `lib/restaurant-images.ts` so detail pages and cards can't disagree.
+
 ### Clean Slate Deployment
 
 If you need to start fresh:
