@@ -128,13 +128,16 @@ export default function SpinRevealCard({
             className="h-52 w-full sm:h-60"
             captionInset
           />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+          <div className="reveal-scrim pointer-events-none absolute inset-0" />
 
           <div className="absolute inset-x-0 bottom-0 p-5">
-            <p className="mb-1 text-[0.7rem] font-bold uppercase tracking-[0.22em] text-honey-300">
+            <p className="reveal-caption-text mb-1 text-[0.7rem] font-bold uppercase tracking-[0.22em] text-honey-200">
               Spin #{spinNumber} · Tonight you&apos;re eating at
             </p>
-            <h2 id="spin-reveal-name" className="text-3xl font-black leading-tight text-white drop-shadow sm:text-4xl">
+            <h2
+              id="spin-reveal-name"
+              className="reveal-caption-text text-3xl font-black leading-tight text-white sm:text-4xl"
+            >
               {restaurant.name}
             </h2>
           </div>

@@ -245,6 +245,33 @@
   -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 70%);
 }
 
+/* Reveal-card scrim. The result caption sits on imported venue photography we
+   do not control, including blown-out ad shots, so the image is darkened hard
+   from the bottom edge to well above the top of the caption rather than fading
+   in over the last few pixels. The flat second layer knocks the worst
+   highlights out of the rest of the frame without hiding the photo. */
+.reveal-scrim {
+  background-image:
+    linear-gradient(
+      to top,
+      rgba(9, 8, 7, 0.95) 0%,
+      rgba(9, 8, 7, 0.92) 30%,
+      rgba(9, 8, 7, 0.8) 46%,
+      rgba(9, 8, 7, 0.56) 62%,
+      rgba(9, 8, 7, 0.26) 80%,
+      rgba(9, 8, 7, 0) 100%
+    ),
+    linear-gradient(rgba(9, 8, 7, 0.16), rgba(9, 8, 7, 0.16));
+}
+
+/* Second line of defence for the caption text itself, so a long name that
+   wraps past the strong part of the scrim still reads. */
+.reveal-caption-text {
+  text-shadow:
+    0 1px 2px rgba(9, 8, 7, 0.9),
+    0 2px 14px rgba(9, 8, 7, 0.75);
+}
+
 /* Grub Roulette motion. Every animation below is disabled by the
    prefers-reduced-motion block at the end of this file. */
 @keyframes pointer-bounce {
