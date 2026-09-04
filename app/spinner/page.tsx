@@ -103,6 +103,9 @@ function SpinnerPageContent() {
   const [seedUnmapped, setSeedUnmapped] = useState(
     () => hasParamSeed && paramSeed.cuisines.length === 0 && paramSeed.terms.length === 0
   )
+  const [seedBroadened, setSeedBroadened] = useState(false)
+  /** True while the cuisine filter is still exactly what the listing seeded. */
+  const seedOwnsFilters = useRef(paramSeed.cuisines.length > 0 || paramSeed.terms.length > 0)
 
   const [soundEnabled, setSoundEnabled] = useState(true)
   const spinSound = useSound('/sounds/spin.mp3', { volume: 0.4 })
@@ -204,6 +207,8 @@ function SpinnerPageContent() {
           if (seed.cuisines.length > 0) setSelectedCuisines(seed.cuisines)
           else if (seed.terms.length > 0) setSimilarTerms(seed.terms)
           else setSeedUnmapped(true)
+
+          seedOwnsFilters.current = seed.cuisines.length > 0 || seed.terms.length > 0
         }
 
         setSeedPending(false)
@@ -275,8 +280,21 @@ function SpinnerPageContent() {
       if (!response.ok) throw new Error('Failed to load restaurants')
 
       const data = await response.json()
+      const total = data.total ?? (data.restaurants || []).length
+
+      // A listing whose cuisine has no peers left would leave the wheel empty,
+      // which is a dead end the user did not ask for. Widen to the directory and
+      // say so — but never override a filter the user chose themselves.
+      if (total === 0 && seedOwnsFilters.current) {
+        seedOwnsFilters.current = false
+        setSelectedCuisines([])
+        setSimilarTerms([])
+        setSeedBroadened(true)
+        return
+      }
+
       setPool(data.restaurants || [])
-      setPoolTotal(data.total ?? (data.restaurants || []).length)
+      setPoolTotal(total)
       setError(null)
     } catch {
       setPool([])
@@ -342,12 +360,16 @@ function SpinnerPageContent() {
     (moodId: MoodId) => {
       setError(null)
 
+      seedOwnsFilters.current = false
+
       const mood = MOODS_BY_ID[moodId]
       if (mood?.clearsFilters) {
         setActiveMoods([])
         setSelectedCuisines([])
         setSimilarTerms([])
         setSelectedPriceLevel(null)
+        setSeedBroadened(false)
+        setSeedUnmapped(false)
         return
       }
 
@@ -363,6 +385,7 @@ function SpinnerPageContent() {
 
   const toggleCuisine = (cuisine: string) => {
     // Once the user picks a chip, the free-text seed has done its job.
+    seedOwnsFilters.current = false
     setSimilarTerms([])
     setSelectedCuisines(current =>
       current.includes(cuisine) ? current.filter(c => c !== cuisine) : [...current, cuisine]
@@ -370,12 +393,18 @@ function SpinnerPageContent() {
   }
 
   const clearSimilarSeed = () => {
+    seedOwnsFilters.current = false
     setSelectedCuisines([])
     setSimilarTerms([])
+    setSeedBroadened(false)
+    setSeedUnmapped(false)
     setError(null)
   }
 
   const resetFilters = () => {
+    seedOwnsFilters.current = false
+    setSeedBroadened(false)
+    setSeedUnmapped(false)
     setActiveMoods([])
     setSelectedCuisines([])
     setSimilarTerms([])
@@ -505,6 +534,17 @@ function SpinnerPageContent() {
   const seededFromListing = Boolean(referrerParam || hasParamSeed)
   const seedLabel = selectedCuisines.length > 0 ? selectedCuisines.join(' · ') : similarTerms.join(' · ')
 
+  const seedNote = seedBroadened
+    ? `Nothing else in Katy matches ${referrer?.name || 'that spot'} yet, so the whole directory is in play`
+    : seedUnmapped
+      ? `We could not pin down what ${referrer?.name || 'that spot'} serves, so all of Katy is in play`
+      : seedPending
+        ? 'Reading what that spot serves…'
+        : null
+
+  // Once the user clears the seed there is nothing left to explain.
+  const showSeedBanner = seededFromListing && Boolean(seedLabel || seedNote)
+
   const poolSummary = poolLoading
     ? 'Shuffling the deck…'
     : poolTotal === 0
@@ -522,7 +562,7 @@ function SpinnerPageContent() {
         }`}
       />
 
-      <div className="relative mx-auto max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pt-10">
+      <div className="relative mx-auto max-w-5xl px-4 pb-16 pt-4 sm:px-6 sm:pt-10">
         {favoritesOnly && (
           <div className="mb-6 rounded-2xl border border-honey-400/35 bg-honey-900/35 px-4 py-3 text-center">
             <p className="font-semibold">
@@ -534,29 +574,25 @@ function SpinnerPageContent() {
           </div>
         )}
 
-        {seededFromListing && (
-          <div className="mb-6 flex flex-col items-center gap-1 rounded-2xl border border-sage-400/35 bg-sage-800/45 px-4 py-3 text-center">
+        {showSeedBanner && (
+          <div className="mb-4 flex flex-col items-center gap-0.5 rounded-2xl border border-sage-400/35 bg-sage-800/45 px-3 py-2.5 text-center sm:mb-6 sm:gap-1 sm:px-4 sm:py-3">
             {seedLabel ? (
-              <p className="font-semibold">
+              <p className="text-sm font-semibold sm:text-base">
                 <span aria-hidden className="mr-1.5">
                   🎯
                 </span>
-                {referrer
-                  ? `Spinning similar to ${referrer.name}`
-                  : `Spinning similar to ${seedLabel}`}
+                {referrer ? `Spinning similar to ${referrer.name}` : `Spinning similar to ${seedLabel}`}
                 {referrer && <span className="text-bone-100/70"> · {seedLabel}</span>}
               </p>
             ) : (
-              <p className="font-semibold">
+              <p className="text-sm font-semibold sm:text-base">
                 <span aria-hidden className="mr-1.5">
                   🤠
                 </span>
-                {seedUnmapped
-                  ? `We could not pin down what ${referrer?.name || 'that spot'} serves, so all of Katy is in play`
-                  : 'Loading what that spot serves…'}
+                {seedNote}
               </p>
             )}
-            <p className="text-sm text-bone-100/70">
+            <p className="text-xs text-bone-100/70 sm:text-sm">
               Pick a mood or cuisine to steer it, or{' '}
               <button
                 onClick={clearSimilarSeed}
@@ -569,19 +605,19 @@ function SpinnerPageContent() {
           </div>
         )}
 
-        <header className="mb-5 text-center">
-          <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.35em] text-honey-300 sm:text-xs">
+        <header className="mb-4 text-center sm:mb-5">
+          <p className="mb-1.5 text-[0.65rem] font-bold uppercase tracking-[0.35em] text-honey-300 sm:mb-2 sm:text-xs">
             eKaty · Katy, TX
           </p>
           <h1 className="text-4xl font-black leading-none sm:text-6xl">
             Grub <span className="text-primary-500">Roulette</span>
           </h1>
-          <p className="mx-auto mt-2 max-w-md text-sm text-bone-100/70 sm:mt-3 sm:text-lg">
+          <p className="mx-auto mt-1.5 max-w-md text-sm text-bone-100/70 sm:mt-3 sm:text-lg">
             {moodTagline || 'Tell us what you\u2019re in the mood for. The wheel handles the rest.'}
           </p>
         </header>
 
-        <div className="mb-5">
+        <div className="mb-4 sm:mb-5">
           <MoodChips
             activeMoods={activeMoods}
             onToggle={toggleMood}
@@ -685,7 +721,7 @@ function SpinnerPageContent() {
                         aria-pressed={selectedCuisines.includes(cuisine)}
                         className={`min-h-[36px] rounded-full px-3 text-sm font-semibold transition disabled:opacity-50 ${
                           selectedCuisines.includes(cuisine)
-                            ? 'bg-sage-600 text-bone-50 shadow-[0_0_0_1px_rgba(207,162,103,0.45)]'
+                            ? 'bg-sage-400 text-charcoal-900 ring-2 ring-honey-300/70'
                             : 'bg-charcoal-700/70 text-bone-100/80 hover:bg-charcoal-600'
                         }`}
                       >

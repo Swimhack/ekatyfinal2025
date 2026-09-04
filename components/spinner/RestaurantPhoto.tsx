@@ -36,16 +36,16 @@ export function PhotoPlaceholder({
 
   return (
     <div
-      className={`flex h-full w-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,#7f1d1d,#1c1917_70%)] text-center ${
+      className={`flex h-full w-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,#3e5245,#1b1815_72%)] text-center ${
         captionInset ? 'pb-24' : ''
       }`}
       role="img"
       aria-label={`No photo available for ${name}`}
     >
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-amber-400/70 bg-black/30 text-3xl font-black text-amber-300">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-honey-400/70 bg-charcoal-950/40 text-3xl font-black text-honey-300">
         {initial}
       </div>
-      <p className="px-6 text-[0.65rem] uppercase tracking-[0.2em] text-white/55">
+      <p className="px-6 text-[0.65rem] uppercase tracking-[0.2em] text-bone-100/60">
         {cuisine || 'Photo coming soon'}
       </p>
     </div>
@@ -67,7 +67,7 @@ export default function RestaurantPhoto({
   }, [candidate])
 
   return (
-    <div className={`relative overflow-hidden bg-stone-900 ${className}`}>
+    <div className={`relative overflow-hidden bg-charcoal-900 ${className}`}>
       {candidate && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element -- listing photos come from arbitrary import domains
         <img
