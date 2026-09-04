@@ -10,6 +10,7 @@ import {
 import { isLlmSearchEnabled, llmInterpret } from '@/lib/search/llm-fallback'
 import { parsePhotos } from '@/lib/photos/parse-photos'
 import { filterDisplayPhotos } from '@/lib/photos/photo-policy'
+import { collapseChainListings } from '@/lib/listings/chain-density'
 
 export interface SearchRestaurantsParams {
   q?: string | null
@@ -24,6 +25,12 @@ export interface SearchRestaurantsParams {
   limit?: number
   offset?: number
   sortBy?: string | null
+  /**
+   * Cards a single chain may occupy, for grids that would otherwise be taken
+   * over by one brand. Omit it to return every location, which is what the map
+   * and any brand-specific query need.
+   */
+  maxPerChain?: number | null
 }
 
 const PRICE_LEVEL_RANK: Record<string, number> = {
@@ -91,6 +98,11 @@ export async function searchRestaurants(params: SearchRestaurantsParams) {
   // Proximity and opening hours can only be resolved once rows are loaded — the
   // first needs coordinates, the second a JSON column — so both page in memory.
   let rankInMemory = Boolean(origin) || parsed.openNow
+
+  const maxPerChain = params.maxPerChain ?? 0
+  // Typing a brand into the search box is a request for its locations, so only
+  // browse-style result sets get thinned.
+  const collapseChains = maxPerChain > 0 && !q
   const prioritizeOfficialPhotos =
     !rankInMemory &&
     !q &&
@@ -100,6 +112,13 @@ export async function searchRestaurants(params: SearchRestaurantsParams) {
     !lat &&
     !lng &&
     (!params.sortBy || params.sortBy === 'rating')
+
+  /**
+   * Thinning chains removes rows from the middle of the ordering, so the whole
+   * candidate pool has to be in hand before paging — otherwise a page loses the
+   * cards that were dropped instead of backfilling from further down.
+   */
+  let pageInMemory = rankInMemory || collapseChains
 
   const select = {
     include: { _count: { select: { reviews: true, favorites: true } } },
@@ -138,8 +157,12 @@ export async function searchRestaurants(params: SearchRestaurantsParams) {
       }
     }
     const orderedPhotoRows = [...uniquePhotoRows, ...repeatedPhotoRows]
-    const photoRows = orderedPhotoRows.slice(offset, offset + limit)
-    const remaining = limit - photoRows.length
+    const photoRows = pageInMemory
+      ? orderedPhotoRows
+      : orderedPhotoRows.slice(offset, offset + limit)
+    // Collapsing can drop most of a page, so ask for a page's worth beyond the
+    // requested window and let the slice at the end trim it back.
+    const remaining = pageInMemory ? offset + limit * 2 : limit - photoRows.length
     const fallbackRows =
       remaining > 0
         ? await prisma.restaurant.findMany({
@@ -149,7 +172,7 @@ export async function searchRestaurants(params: SearchRestaurantsParams) {
             },
             ...select,
             take: remaining,
-            skip: Math.max(0, offset - photoCount),
+            skip: pageInMemory ? 0 : Math.max(0, offset - photoCount),
           })
         : []
     restaurants = [...photoRows, ...fallbackRows]
@@ -157,8 +180,8 @@ export async function searchRestaurants(params: SearchRestaurantsParams) {
     restaurants = await prisma.restaurant.findMany({
       where,
       ...select,
-      take: rankInMemory ? 500 : limit + 20,
-      skip: rankInMemory ? 0 : offset,
+      take: pageInMemory ? 500 : limit + 20,
+      skip: pageInMemory ? 0 : offset,
     })
   }
 
@@ -184,11 +207,12 @@ export async function searchRestaurants(params: SearchRestaurantsParams) {
       conditions = buildSearchConditions(widened, filters)
       where = { active: true, AND: conditions }
       rankInMemory = Boolean(origin) || widened.openNow
+      pageInMemory = rankInMemory || collapseChains
       restaurants = await prisma.restaurant.findMany({
         where,
         ...select,
-        take: rankInMemory ? 500 : limit + 20,
-        skip: rankInMemory ? 0 : offset,
+        take: pageInMemory ? 500 : limit + 20,
+        skip: pageInMemory ? 0 : offset,
       })
       if (restaurants.length) {
         interpretedBy = 'model'
@@ -238,7 +262,13 @@ export async function searchRestaurants(params: SearchRestaurantsParams) {
     restaurants.sort((a, b) => b._count.reviews - a._count.reviews)
   }
 
-  restaurants = rankInMemory
+  // After ordering, so the location a chain keeps is its best-placed one, and
+  // before paging, so the freed slots go to independents further down.
+  if (collapseChains) {
+    restaurants = collapseChainListings(restaurants, { maxPerChain })
+  }
+
+  restaurants = pageInMemory
     ? restaurants.slice(offset, offset + limit)
     : restaurants.slice(0, limit)
 

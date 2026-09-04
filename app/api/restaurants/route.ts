@@ -31,6 +31,9 @@ export async function GET(request: NextRequest) {
       limit: parseInt(searchParams.get('limit') || '20'),
       offset: parseInt(searchParams.get('offset') || '0'),
       sortBy: searchParams.get('sortBy'),
+      // Opt-in per caller: a listing grid wants one card per brand, the map
+      // wants a pin on every location.
+      maxPerChain: parseInt(searchParams.get('maxPerChain') || '0') || null,
     })
 
     const normalizedResult = Array.isArray(result)

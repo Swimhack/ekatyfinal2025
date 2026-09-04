@@ -46,6 +46,9 @@ export default async function CategoryPage({ params }: { params: { slug: string 
     categoryTags: category.tags,
     limit: MAX_LISTINGS,
     sortBy: 'rating',
+    // One card per brand. Fifteen Starbucks rows used to fill the top of this
+    // page ahead of most of Katy's independent coffee shops.
+    maxPerChain: 1,
   })
 
   const url = `${SITE_URL}/categories/${category.slug}`

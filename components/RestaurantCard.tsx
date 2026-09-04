@@ -68,6 +68,13 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
               {restaurant.distance.toFixed(1)} mi
             </div>
           )}
+          {/* A grid shows one card per brand, so the card has to account for the
+              locations it stands in for. */}
+          {restaurant.chainLocationCount > 1 && (
+            <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs font-medium">
+              {restaurant.chainLocationCount} locations in Katy
+            </div>
+          )}
         </div>
 
         <div className="p-4">
