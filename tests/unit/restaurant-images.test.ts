@@ -12,6 +12,7 @@ import {
 
 const BRAND_OG = 'https://cdn.example.com/brand-og.jpg'
 const UPLOADED_HERO = '/uploads/restaurants/hero-1730000000000-abc123.jpg'
+const SECOND_UPLOAD = '/uploads/restaurants/hero-1730000009999-def456.jpg'
 
 describe('parseRestaurantMetadata', () => {
   it('parses JSON strings and tolerates junk', () => {
@@ -123,6 +124,53 @@ describe('applyHeroImage', () => {
     })
 
     expect(second.metadata.heroImageAddedToPhotos).toBe(true)
+    expect(second.photos).toEqual([UPLOADED_HERO, BRAND_OG])
+  })
+
+  it('re-saving an already-promoted gallery hero keeps its original index', () => {
+    const gallery = [BRAND_OG, '/b.jpg', '/c.jpg']
+
+    const first = applyHeroImage({ metadata: {}, photos: gallery, heroImage: '/c.jpg' })
+    expect(first.metadata.heroImagePreviousPhotoIndex).toBe(2)
+
+    // Saving the form again (photos now start with the hero) must not record 0
+    const second = applyHeroImage({
+      metadata: first.metadata,
+      photos: first.photos,
+      heroImage: '/c.jpg',
+    })
+
+    expect(second.metadata.heroImagePreviousPhotoIndex).toBe(2)
+    expect(second.photos).toEqual(['/c.jpg', BRAND_OG, '/b.jpg'])
+  })
+
+  it('drops an injected hero from photos when a new hero replaces it', () => {
+    const withHeroA = applyHeroImage({ metadata: {}, photos: [BRAND_OG], heroImage: UPLOADED_HERO })
+    expect(withHeroA.photos).toEqual([UPLOADED_HERO, BRAND_OG])
+
+    const withHeroB = applyHeroImage({
+      metadata: withHeroA.metadata,
+      photos: withHeroA.photos,
+      heroImage: SECOND_UPLOAD,
+    })
+
+    expect(withHeroB.photos).toEqual([SECOND_UPLOAD, BRAND_OG])
+    expect(withHeroB.photos).not.toContain(UPLOADED_HERO)
+    expect(withHeroB.metadata.heroImageAddedToPhotos).toBe(true)
+  })
+
+  it('keeps a curated photo when it stops being the hero', () => {
+    const gallery = [BRAND_OG, '/b.jpg']
+
+    const withGalleryHero = applyHeroImage({ metadata: {}, photos: gallery, heroImage: '/b.jpg' })
+    const withUploadHero = applyHeroImage({
+      metadata: withGalleryHero.metadata,
+      photos: withGalleryHero.photos,
+      heroImage: UPLOADED_HERO,
+    })
+
+    // /b.jpg was the restaurant's own photo, so it survives at its old position
+    expect(withUploadHero.photos).toEqual([UPLOADED_HERO, BRAND_OG, '/b.jpg'])
   })
 
   it('never duplicates a hero that was already in photos', () => {
@@ -180,6 +228,36 @@ describe('clearHeroImage', () => {
 
     // Back where the admin had it, so it is no longer the primary image
     expect(cleared.photos).toEqual([BRAND_OG, UPLOADED_HERO])
+    expect(resolveHeroImage({ metadata: cleared.metadata, photos: cleared.photos })).toBe(BRAND_OG)
+  })
+
+  it('restores a non-zero index after the hero was re-saved', () => {
+    const gallery = [BRAND_OG, '/b.jpg', '/c.jpg']
+
+    const first = applyHeroImage({ metadata: {}, photos: gallery, heroImage: '/c.jpg' })
+    const resaved = applyHeroImage({
+      metadata: first.metadata,
+      photos: first.photos,
+      heroImage: '/c.jpg',
+    })
+    const cleared = clearHeroImage({ metadata: resaved.metadata, photos: resaved.photos })
+
+    expect(cleared.photos).toEqual(gallery)
+    expect(resolveHeroImage({ metadata: cleared.metadata, photos: cleared.photos })).toBe(BRAND_OG)
+  })
+
+  it('does not resurrect a replaced upload when the new hero is cleared', () => {
+    const withHeroA = applyHeroImage({ metadata: {}, photos: [BRAND_OG], heroImage: UPLOADED_HERO })
+    const withHeroB = applyHeroImage({
+      metadata: withHeroA.metadata,
+      photos: withHeroA.photos,
+      heroImage: SECOND_UPLOAD,
+    })
+
+    const cleared = clearHeroImage({ metadata: withHeroB.metadata, photos: withHeroB.photos })
+
+    expect(cleared.photos).toEqual([BRAND_OG])
+    expect(cleared.photos).not.toContain(UPLOADED_HERO)
     expect(resolveHeroImage({ metadata: cleared.metadata, photos: cleared.photos })).toBe(BRAND_OG)
   })
 

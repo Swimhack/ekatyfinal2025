@@ -101,6 +101,34 @@ export interface HeroImageWrite {
   photosCsv: string
 }
 
+/**
+ * Rewinds a previous `applyHeroImage` promotion, returning the gallery order the
+ * admin actually curated.
+ *
+ * Both writers start from this: measuring against the already-promoted list is
+ * what let a re-save record index 0 for a photo that was originally further down,
+ * and what let a replaced hero linger in `photos`.
+ */
+function restoreGalleryOrder(metadata: Record<string, any>, photos: string[]): string[] {
+  const previousHero = resolveExplicitHeroImage(metadata)
+
+  if (!previousHero || !photos.includes(previousHero)) return photos
+
+  const without = photos.filter((photo) => photo !== previousHero)
+
+  // This module injected it, so rewinding takes it back out.
+  if (metadata[HERO_IN_PHOTOS_FLAG] === true) return without
+
+  const previousIndex = metadata[HERO_PHOTO_INDEX_KEY]
+  if (typeof previousIndex === 'number' && previousIndex >= 0) {
+    const target = Math.min(previousIndex, without.length)
+    return [...without.slice(0, target), previousHero, ...without.slice(target)]
+  }
+
+  // Legacy row with no bookkeeping: leave the list untouched rather than guess.
+  return photos
+}
+
 /** Writes the hero to every key consumers read, and promotes it to `photos[0]`. */
 export function applyHeroImage(options: {
   metadata: MetadataInput
@@ -114,24 +142,23 @@ export function applyHeroImage(options: {
     throw new Error('applyHeroImage requires a non-empty hero image URL')
   }
 
-  const existingPhotos = parsePhotos(options.photos)
-  const previousHero = resolveExplicitHeroImage(options.metadata)
-  const wasGalleryPhoto =
-    existingPhotos.includes(hero) &&
-    // A hero this function previously injected doesn't count as a gallery photo.
-    !(previousHero === hero && metadata[HERO_IN_PHOTOS_FLAG] === true)
+  // Rewind the previous hero first: a hero this module injected is dropped when
+  // it is replaced, and a gallery photo goes back to its curated position, so
+  // the bookkeeping below describes the real gallery rather than a promoted list.
+  const gallery = restoreGalleryOrder(metadata, parsePhotos(options.photos))
+  const wasGalleryPhoto = gallery.includes(hero)
 
   metadata.heroImage = hero
   metadata.profileImageUrl = hero
   metadata[HERO_IN_PHOTOS_FLAG] = !wasGalleryPhoto
 
   if (wasGalleryPhoto) {
-    metadata[HERO_PHOTO_INDEX_KEY] = existingPhotos.indexOf(hero)
+    metadata[HERO_PHOTO_INDEX_KEY] = gallery.indexOf(hero)
   } else {
     delete metadata[HERO_PHOTO_INDEX_KEY]
   }
 
-  const photos = orderPhotosWithHeroFirst(existingPhotos, hero)
+  const photos = orderPhotosWithHeroFirst(gallery, hero)
 
   return { metadata, photos, photosCsv: serializePhotos(photos) }
 }
@@ -148,30 +175,12 @@ export function clearHeroImage(options: {
   photos?: PhotosInput
 }): HeroImageWrite {
   const metadata = parseRestaurantMetadata(options.metadata)
-  const previousHero = resolveExplicitHeroImage(options.metadata)
-  const wasAddedByUs = metadata[HERO_IN_PHOTOS_FLAG] === true
-  const previousIndex = metadata[HERO_PHOTO_INDEX_KEY]
+  const photos = restoreGalleryOrder(metadata, parsePhotos(options.photos))
 
   delete metadata.heroImage
   delete metadata.profileImageUrl
   delete metadata[HERO_IN_PHOTOS_FLAG]
   delete metadata[HERO_PHOTO_INDEX_KEY]
-
-  let photos = parsePhotos(options.photos)
-
-  if (previousHero && photos.includes(previousHero)) {
-    const without = photos.filter((photo) => photo !== previousHero)
-
-    if (wasAddedByUs) {
-      // This module put it in the list, so clearing takes it back out.
-      photos = without
-    } else if (typeof previousIndex === 'number' && previousIndex >= 0) {
-      // It was already a gallery photo: restore its original position so it
-      // stops being the primary image.
-      const target = Math.min(previousIndex, without.length)
-      photos = [...without.slice(0, target), previousHero, ...without.slice(target)]
-    }
-  }
 
   return { metadata, photos, photosCsv: serializePhotos(photos) }
 }
