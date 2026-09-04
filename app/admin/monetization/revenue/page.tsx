@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import MetricsCard from '@/components/admin/monetization/MetricsCard'
 import RevenueChart from '@/components/admin/monetization/RevenueChart'
+import { readJson } from '@/lib/utils/api-response'
 
 interface RevenueMetrics {
   total_mrr: number
@@ -56,7 +57,7 @@ export default function RevenueDashboardPage() {
       setError(null)
 
       const response = await fetch(`/api/admin/revenue/metrics?period=${period}`)
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (response.ok) {
         setMetrics(data.metrics)
@@ -92,7 +93,7 @@ export default function RevenueDashboardPage() {
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
       } else {
-        const data = await response.json()
+        const data = await readJson(response)
         setError(data.error || 'Failed to export report')
       }
     } catch (err) {

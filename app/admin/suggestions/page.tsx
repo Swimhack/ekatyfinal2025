@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 interface Suggestion {
   id: string
@@ -34,7 +35,7 @@ export default function SuggestionsPage() {
   const fetchSuggestions = async () => {
     try {
       const response = await fetch(`/api/suggestions?status=${filter}`)
-      const data = await response.json()
+      const data = await readJson(response)
       setSuggestions(data.suggestions || [])
       setStats(data.stats || {})
     } catch (error) {

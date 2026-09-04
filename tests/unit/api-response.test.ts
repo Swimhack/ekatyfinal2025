@@ -2,6 +2,7 @@ import {
   httpErrorMessage,
   looksLikeHtml,
   parseJsonResponse,
+  readJson,
   summarizeResponseBody,
 } from '../../lib/utils/api-response'
 
@@ -135,5 +136,27 @@ describe('parseJsonResponse', () => {
 
     expect(parsed.ok).toBe(false)
     expect(parsed.error).toMatch(/too large/i)
+  })
+})
+
+describe('readJson', () => {
+  it('returns the payload for JSON responses, including error payloads', async () => {
+    await expect(readJson(makeResponse(JSON.stringify({ articles: [] })))).resolves.toEqual({
+      articles: [],
+    })
+
+    // Error bodies are returned, not thrown, so callers keep their own ok checks
+    await expect(
+      readJson(makeResponse(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }))
+    ).resolves.toEqual({ error: 'Unauthorized' })
+  })
+
+  it('throws a human message instead of a SyntaxError on HTML', async () => {
+    await expect(
+      readJson(makeResponse(NGINX_413, { status: 413, contentType: 'text/html' }))
+    ).rejects.toThrow(/upload too large/i)
+
+    await expect(readJson(makeResponse('<html><body>502</body></html>', { status: 502 })))
+      .rejects.toThrow(/unavailable/i)
   })
 })

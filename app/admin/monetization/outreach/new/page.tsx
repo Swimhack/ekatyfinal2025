@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 export default function NewCampaignPage() {
   const router = useRouter()
@@ -46,7 +47,7 @@ export default function NewCampaignPage() {
         }),
       })
 
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (response.ok) {
         // Redirect to campaign detail page

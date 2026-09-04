@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 type View = 'overview' | 'launch' | 'restaurants' | 'sessions' | 'funnels' | 'performance'
 
@@ -39,7 +40,7 @@ export default function AnalyticsPage() {
           params.set('days', String(days))
         }
         const res = await fetch(`/api/admin/analytics?${params.toString()}`)
-        const data: ApiResponse = await res.json()
+        const data: ApiResponse = await readJson(res)
         if (!res.ok || data.error) {
           if (!isMounted) return
           setError(data.error || 'Failed to load analytics')

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 // Note: In production, this should be handled server-side or via session auth
 // For now, using a client-side approach matching the original PHP implementation
@@ -42,7 +43,7 @@ export default function BlogManagerPage() {
           'Authorization': `Bearer ${ADMIN_API_KEY}`
         }
       })
-      const data = await response.json()
+      const data = await readJson(response)
       setArticles(data.articles || [])
     } catch (error) {
       console.error('Error fetching articles:', error)
@@ -72,7 +73,7 @@ export default function BlogManagerPage() {
         })
       })
 
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (data.success) {
         setMessage({ type: 'success', text: '✅ Article generated and published successfully!' })
@@ -100,7 +101,7 @@ export default function BlogManagerPage() {
         }
       })
 
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (data.success) {
         setMessage({ type: 'success', text: 'Article deleted successfully!' })
@@ -325,7 +326,7 @@ function ArticleForm({ article, onSuccess, onCancel }: {
         body: JSON.stringify(body)
       })
 
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (data.success) {
         onSuccess()

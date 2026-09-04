@@ -71,6 +71,26 @@ export function httpErrorMessage(
 }
 
 /**
+ * Drop-in replacement for `response.json()` that throws a human-readable Error
+ * instead of a `SyntaxError` when the body is an HTML error page. Use it where
+ * the caller already has a try/catch and only needs the message to make sense.
+ */
+export async function readJson<T = any>(
+  response: Response,
+  fallback = 'Request failed'
+): Promise<T> {
+  const parsed = await parseJsonResponse<T>(response, fallback)
+
+  if (parsed.data === null) {
+    throw new Error(parsed.error || fallback)
+  }
+
+  // Error payloads are returned rather than thrown, so callers can keep doing
+  // their own `response.ok` checks and read `data.error` as before.
+  return parsed.data
+}
+
+/**
  * Reads a response body once and parses it as JSON without ever throwing a
  * SyntaxError at the caller.
  */
