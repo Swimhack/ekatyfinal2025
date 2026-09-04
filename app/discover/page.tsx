@@ -52,6 +52,9 @@ function DiscoverPageContent() {
     if (selectedPriceLevel) params.append('priceLevel', selectedPriceLevel)
     if (showFeaturedOnly) params.append('featured', 'true')
     params.append('sortBy', sortBy)
+    // One card per brand while browsing. The API ignores this when a search
+    // term is present, so typing a chain's name still lists its locations.
+    params.append('maxPerChain', '1')
     params.append('limit', '12')
     params.append('offset', reset ? '0' : offset.toString())
     

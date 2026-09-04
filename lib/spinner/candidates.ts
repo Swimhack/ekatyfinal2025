@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client'
+import { parsePhotos } from '@/lib/photos/parse-photos'
+import { filterDisplayPhotos } from '@/lib/photos/photo-policy'
 
 export interface CandidateFilters {
   /** Cuisine / category labels chosen explicitly by the user. */
@@ -173,7 +175,10 @@ export function serializeRestaurant(restaurant: any) {
     verified: restaurant.verified ?? false,
     categories: splitList(restaurant.categories),
     cuisineTypes: splitList(restaurant.cuisineTypes),
-    photos: splitList(restaurant.photos),
+    // Filtered here as well as at render, so the payload never carries a URL
+    // the UI is required to refuse. splitList would also break the CDN URLs
+    // that contain commas.
+    photos: filterDisplayPhotos(parsePhotos(restaurant.photos)),
     logoUrl: restaurant.logoUrl ?? null,
     distance: typeof restaurant.distance === 'number' ? restaurant.distance : undefined,
   }

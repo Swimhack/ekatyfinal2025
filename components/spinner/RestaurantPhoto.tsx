@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { filterDisplayPhotos } from '@/lib/photos/photo-policy'
 
 interface RestaurantPhotoProps {
   photos: string[]
@@ -9,18 +10,6 @@ interface RestaurantPhotoProps {
   className?: string
   /** Lifts the placeholder clear of a caption overlay sitting on the image. */
   captionInset?: boolean
-}
-
-/**
- * Stock photography is never presented as a venue photo. If a listing has no
- * usable image we fall back to a branded plate that is obviously a placeholder.
- */
-function isUsableVenuePhoto(url: string | undefined): url is string {
-  if (!url) return false
-  const normalized = url.trim().toLowerCase()
-  if (!normalized.startsWith('http') && !normalized.startsWith('/')) return false
-  // Stock libraries were used as filler during imports; they are not this venue.
-  return !normalized.includes('unsplash.com') && !normalized.includes('pexels.com')
 }
 
 export function PhotoPlaceholder({
@@ -59,7 +48,14 @@ export default function RestaurantPhoto({
   className = '',
   captionInset = false,
 }: RestaurantPhotoProps) {
-  const candidate = photos.find(isUsableVenuePhoto)
+  /**
+   * The reveal is the loudest place a photo appears, so it defers to the same
+   * policy as the listing grids rather than keeping its own idea of a usable
+   * image. Its local check only knew about stock libraries, which let a chain's
+   * Open Graph tile through — a corporate square is not this venue either, and
+   * the placeholder below is the honest answer.
+   */
+  const candidate = filterDisplayPhotos(photos)[0]
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
