@@ -232,8 +232,8 @@ export function parseSearchQuery(raw: string): ParsedQuery {
     result.terms.push(token)
   }
 
-  result.cuisines = [...new Set(result.cuisines)]
-  result.zips = [...new Set(result.zips)]
+  result.cuisines = Array.from(new Set(result.cuisines))
+  result.zips = Array.from(new Set(result.zips))
 
   if (result.cuisines.length) result.labels.push(result.cuisines[0])
   if (result.priceLevel) result.labels.push(result.priceLevel.toLowerCase())
@@ -253,7 +253,7 @@ export function parseSearchQuery(raw: string): ParsedQuery {
 export function termVariants(term: string): string[] {
   const variants = new Set([term])
   if (term.length > 3 && term.endsWith('s')) variants.add(term.slice(0, -1))
-  return [...variants]
+  return Array.from(variants)
 }
 
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
