@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { orderPhotosWithHeroFirst, resolveHeroImage } from '@/lib/restaurant-images'
 
 export async function GET(
   request: NextRequest,
@@ -48,27 +49,21 @@ export async function GET(
       )
     }
     
-    // Parse metadata to get heroImage
-    let metadata: any = {}
-    try {
-      metadata = restaurant.metadata ? JSON.parse(restaurant.metadata) : {}
-    } catch (e) {
-      console.error('Error parsing metadata:', e)
-      metadata = {}
-    }
+    // Hero image can live under either metadata key, or fall back to photos/logo
+    const heroImage = resolveHeroImage(restaurant)
 
     console.log('Public API - Restaurant:', restaurant.name)
     console.log('Public API - Metadata:', restaurant.metadata)
-    console.log('Public API - HeroImage:', metadata.heroImage)
-    
+    console.log('Public API - HeroImage:', heroImage)
+
     // Parse string fields back to arrays for response
     const formattedRestaurant = {
       ...restaurant,
       categories: restaurant.categories ? restaurant.categories.split(',').map((c: string) => c.trim()) : [],
       cuisineTypes: restaurant.cuisineTypes ? restaurant.cuisineTypes.split(',').map((c: string) => c.trim()) : [],
-      photos: restaurant.photos ? restaurant.photos.split(',').map((p: string) => p.trim()) : [],
+      photos: orderPhotosWithHeroFirst(restaurant.photos, heroImage),
       hours: restaurant.hours ? JSON.parse(restaurant.hours) : {},
-      heroImage: metadata.heroImage || null,
+      heroImage,
       reviews: restaurant.reviews.map((review: any) => ({
         ...review,
         photos: review.photos ? review.photos.split(',').map((p: string) => p.trim()) : []

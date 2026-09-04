@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import {
+  applyHeroImage,
+  clearHeroImage,
+  parseRestaurantMetadata,
+  resolveExplicitHeroImage,
+  resolveHeroImage,
+  serializePhotos,
+} from '@/lib/restaurant-images'
 
 // GET - Fetch restaurant for editing
 export async function GET(
@@ -21,21 +29,17 @@ export async function GET(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 404 })
     }
 
-    // Parse metadata to get heroImage
-    let metadata: any = {}
-    try {
-      metadata = restaurant.metadata ? JSON.parse(restaurant.metadata) : {}
-    } catch (e) {
-      console.error('Error parsing metadata in GET:', e)
-      metadata = {}
-    }
+    // `heroImage` is the saved value the form edits; `displayImage` is what the
+    // public pages currently show, so the admin can see the two agree.
+    const heroImage = resolveExplicitHeroImage(restaurant.metadata)
 
     console.log('Restaurant metadata:', restaurant.metadata)
-    console.log('Parsed heroImage:', metadata.heroImage)
-    
+    console.log('Saved heroImage:', heroImage)
+
     return NextResponse.json({
       ...restaurant,
-      heroImage: metadata.heroImage || null
+      heroImage,
+      displayImage: resolveHeroImage(restaurant)
     })
   } catch (error) {
     console.error('Error fetching restaurant:', error)
@@ -74,30 +78,31 @@ export async function PATCH(
       photos
     } = body
 
-    // Store heroImage in metadata field as JSON
+    // Hero images live in the metadata JSON blob, and every consumer of
+    // photos[0] has to agree with them, so both are computed together.
     const currentRestaurant = await prisma.restaurant.findUnique({
       where: { id: params.id },
-      select: { metadata: true }
+      select: { metadata: true, photos: true }
     })
 
-    let metadata: any = {}
-    try {
-      metadata = currentRestaurant?.metadata ? JSON.parse(currentRestaurant.metadata) : {}
-    } catch (e) {
-      console.error('Error parsing metadata:', e)
-      metadata = {}
-    }
-    
+    let metadata: Record<string, any> = parseRestaurantMetadata(currentRestaurant?.metadata)
+    // Photos the request is saving, falling back to what is already stored.
+    let photosValue: string | undefined = photos !== undefined ? serializePhotos(photos) : undefined
+
     if (heroImage !== undefined) {
-      // Only save heroImage if it's a non-empty string
-      // This prevents saving empty strings when upload fails
-      if (heroImage && heroImage.trim() !== '') {
-        metadata.heroImage = heroImage
-        console.log('Setting heroImage in metadata:', heroImage)
+      if (typeof heroImage === 'string' && heroImage.trim() !== '') {
+        const applied = applyHeroImage({
+          metadata,
+          photos: photosValue !== undefined ? photosValue : currentRestaurant?.photos,
+          heroImage
+        })
+        metadata = applied.metadata
+        photosValue = applied.photosCsv
+        console.log('Setting hero image everywhere (metadata + photos[0]):', heroImage)
       } else if (heroImage === '' || heroImage === null) {
-        // Explicitly remove heroImage if empty string or null
-        delete metadata.heroImage
-        console.log('Removing heroImage from metadata (empty value provided)')
+        // Explicitly clear both hero keys; photos[0] becomes the fallback again
+        metadata = clearHeroImage(metadata)
+        console.log('Removing hero image from metadata (empty value provided)')
       }
     }
 
@@ -121,7 +126,7 @@ export async function PATCH(
         ...(verified !== undefined && { verified }),
         ...(active !== undefined && { active }),
         ...(logoUrl !== undefined && { logoUrl }),
-        ...(photos !== undefined && { photos }),
+        ...(photosValue !== undefined && { photos: photosValue }),
         metadata: metadataString,
         updatedAt: new Date()
       }
@@ -141,13 +146,13 @@ export async function PATCH(
       }
     })
 
-    // Return with parsed heroImage for verification
-    const savedMetadata = restaurant.metadata ? JSON.parse(restaurant.metadata) : {}
-    return NextResponse.json({ 
-      success: true, 
+    // Return with the saved hero image so the client can verify the write
+    return NextResponse.json({
+      success: true,
       restaurant: {
         ...restaurant,
-        heroImage: savedMetadata.heroImage || null
+        heroImage: resolveExplicitHeroImage(restaurant.metadata),
+        displayImage: resolveHeroImage(restaurant)
       }
     })
   } catch (error) {
