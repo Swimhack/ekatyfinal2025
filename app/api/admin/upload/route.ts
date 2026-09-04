@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { buildUploadKey, saveUpload, UploadStorageError } from '@/lib/upload-storage'
+import {
+  assertUploadableImage,
+  buildUploadKey,
+  saveUpload,
+  UploadStorageError,
+} from '@/lib/upload-storage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -36,6 +41,15 @@ export async function POST(request: NextRequest) {
 
     if (!file.type.startsWith('image/')) {
       return NextResponse.json({ error: 'File must be an image' }, { status: 400 })
+    }
+
+    // Uploads are served from this origin, so SVG (which can run script) and
+    // other non-raster types are refused outright.
+    try {
+      assertUploadableImage(file.type, file.name)
+    } catch (typeError) {
+      const message = typeError instanceof Error ? typeError.message : 'Unsupported image type'
+      return NextResponse.json({ error: message }, { status: 400 })
     }
 
     if (file.size > MAX_FILE_SIZE) {

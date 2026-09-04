@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
-import { buildUploadKey, saveUpload, UploadStorageError } from '@/lib/upload-storage'
+import {
+  assertUploadableImage,
+  buildUploadKey,
+  saveUpload,
+  UploadStorageError,
+} from '@/lib/upload-storage'
 
 const prisma = new PrismaClient()
 
@@ -38,6 +43,14 @@ export async function POST(request: NextRequest) {
 
     if (!file.type.startsWith('image/')) {
       return NextResponse.json({ error: 'File must be an image' }, { status: 400 })
+    }
+
+    // Same-origin serving means SVG could run script as the site; raster only.
+    try {
+      assertUploadableImage(file.type, file.name)
+    } catch (typeError) {
+      const message = typeError instanceof Error ? typeError.message : 'Unsupported image type'
+      return NextResponse.json({ error: message }, { status: 400 })
     }
 
     if (file.size > MAX_FILE_SIZE) {

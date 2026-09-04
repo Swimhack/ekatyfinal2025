@@ -14,6 +14,12 @@ export interface SaveUploadResult {
   writtenPaths: string[]
 }
 
+/**
+ * Raster formats only. SVG is deliberately absent: uploads are served from the
+ * site's own origin, and an SVG served as image/svg+xml executes its embedded
+ * script there, which would let anyone who can upload an image run script as
+ * ekaty.com (stored XSS). Every raster type here is inert when rendered.
+ */
 const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
@@ -21,7 +27,6 @@ const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
   'image/webp': 'webp',
   'image/gif': 'gif',
   'image/avif': 'avif',
-  'image/svg+xml': 'svg',
 }
 
 const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
@@ -31,8 +36,11 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   webp: 'image/webp',
   gif: 'image/gif',
   avif: 'image/avif',
-  svg: 'image/svg+xml',
 }
+
+export const ALLOWED_UPLOAD_CONTENT_TYPES = Object.keys(EXTENSION_BY_CONTENT_TYPE)
+
+const SAFE_INLINE_CONTENT_TYPES = new Set(Object.values(CONTENT_TYPE_BY_EXTENSION))
 
 export class UploadStorageError extends Error {
   constructor(message: string, readonly cause?: unknown) {
@@ -106,6 +114,34 @@ export function contentTypeForKey(key: string): string {
   return CONTENT_TYPE_BY_EXTENSION[extension] || 'application/octet-stream'
 }
 
+/** True only for types a browser renders without being able to run script. */
+export function isSafeInlineContentType(contentType: string): boolean {
+  return SAFE_INLINE_CONTENT_TYPES.has(contentType.toLowerCase().split(';')[0].trim())
+}
+
+/**
+ * Gate for incoming uploads. Rejects anything that is not an inert raster
+ * image, by declared type and by filename, so an SVG cannot slip through by
+ * claiming to be a PNG or by arriving with a mislabelled content type.
+ */
+export function assertUploadableImage(contentType: string, originalName?: string): void {
+  const normalized = (contentType || '').toLowerCase().split(';')[0].trim()
+  const extension = (originalName || '').split('.').pop()?.toLowerCase() ?? ''
+  const friendlyList = 'JPEG, PNG, WebP, GIF or AVIF'
+
+  if (normalized === 'image/svg+xml' || normalized === 'image/svg' || extension === 'svg' || extension === 'svgz') {
+    throw new UploadStorageError(
+      `SVG images are not accepted because they can carry scripts. Please upload a ${friendlyList} image.`
+    )
+  }
+
+  if (!EXTENSION_BY_CONTENT_TYPE[normalized]) {
+    throw new UploadStorageError(
+      `Unsupported image type${normalized ? ` (${normalized})` : ''}. Please upload a ${friendlyList} image.`
+    )
+  }
+}
+
 export function buildUploadKey(options: {
   folder: string
   prefix: string
@@ -131,6 +167,9 @@ export async function saveUpload(options: {
   contentType: string
 }): Promise<SaveUploadResult> {
   const key = sanitizeUploadKey(options.key)
+  // Last line of defence: nothing executable is ever written to a public tree,
+  // whatever a caller validated (or forgot to validate) upstream.
+  assertUploadableImage(options.contentType, key)
 
   if (isR2Configured()) {
     try {

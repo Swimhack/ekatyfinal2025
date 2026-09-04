@@ -24,12 +24,36 @@ const nextConfig = {
     instrumentationHook: true,
   },
   async rewrites() {
-    return [
+    return {
+      // SVG never reaches the static handler: files stored before SVG uploads
+      // were refused must not be served as executable image/svg+xml on this
+      // origin. The route handler sends them as a download instead.
+      beforeFiles: [
+        {
+          source: '/uploads/:path(.*\\.svgz?)',
+          destination: '/api/uploads/:path',
+        },
+      ],
       // Runs only when no static file matched: standalone builds can serve from a
       // different public/ tree than the one an upload was written to.
+      afterFiles: [
+        {
+          source: '/uploads/:path*',
+          destination: '/api/uploads/:path*',
+        },
+      ],
+    }
+  },
+  async headers() {
+    return [
       {
+        // Defence in depth for statically served uploads: no sniffing, and no
+        // active content even if a file slipped in before the type gate.
         source: '/uploads/:path*',
-        destination: '/api/uploads/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Content-Security-Policy', value: "default-src 'none'; sandbox" },
+        ],
       },
     ]
   },

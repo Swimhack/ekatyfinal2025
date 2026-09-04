@@ -3,10 +3,13 @@ import { tmpdir } from 'os'
 import path from 'path'
 
 import {
+  ALLOWED_UPLOAD_CONTENT_TYPES,
+  assertUploadableImage,
   buildUploadKey,
   contentTypeForKey,
   extensionFor,
   getUploadRoots,
+  isSafeInlineContentType,
   readLocalUpload,
   sanitizeUploadKey,
   saveUpload,
@@ -78,6 +81,52 @@ describe('upload-storage', () => {
   it('maps keys back to content types', () => {
     expect(contentTypeForKey('restaurants/hero-1.jpg')).toBe('image/jpeg')
     expect(contentTypeForKey('restaurants/hero-1.unknown')).toBe('application/octet-stream')
+  })
+
+  describe('active content is never accepted or served', () => {
+    it('never resolves an SVG key to image/svg+xml', () => {
+      expect(contentTypeForKey('restaurants/hero-1.svg')).toBe('application/octet-stream')
+      expect(ALLOWED_UPLOAD_CONTENT_TYPES).not.toContain('image/svg+xml')
+    })
+
+    it('marks only inert raster types as safe to render inline', () => {
+      expect(isSafeInlineContentType('image/jpeg')).toBe(true)
+      expect(isSafeInlineContentType('image/PNG')).toBe(true)
+      expect(isSafeInlineContentType('image/svg+xml')).toBe(false)
+      expect(isSafeInlineContentType('text/html')).toBe(false)
+      expect(isSafeInlineContentType('application/octet-stream')).toBe(false)
+    })
+
+    it('rejects SVG uploads by content type and by filename', () => {
+      expect(() => assertUploadableImage('image/svg+xml', 'logo.svg')).toThrow(/SVG images are not accepted/i)
+      // An SVG that lies about its content type is still refused
+      expect(() => assertUploadableImage('image/png', 'payload.svg')).toThrow(/SVG images are not accepted/i)
+      expect(() => assertUploadableImage('image/svg', 'payload.png')).toThrow(/SVG images are not accepted/i)
+      expect(() => assertUploadableImage('image/svg+xml', 'payload.svgz')).toThrow(UploadStorageError)
+    })
+
+    it('rejects other non-raster types and accepts the raster ones', () => {
+      expect(() => assertUploadableImage('text/html', 'page.html')).toThrow(/Unsupported image type/i)
+      expect(() => assertUploadableImage('', 'mystery')).toThrow(/Unsupported image type/i)
+
+      for (const contentType of ALLOWED_UPLOAD_CONTENT_TYPES) {
+        expect(() => assertUploadableImage(contentType, 'photo.jpg')).not.toThrow()
+      }
+    })
+
+    it('refuses to write an SVG even if a route forgets to validate', async () => {
+      await expect(
+        saveUpload({
+          buffer: Buffer.from('<svg onload="alert(1)"></svg>'),
+          key: 'restaurants/hero-evil.svg',
+          contentType: 'image/svg+xml',
+        })
+      ).rejects.toThrow(UploadStorageError)
+
+      expect(existsSync(path.join(workDir, 'public', 'uploads', 'restaurants', 'hero-evil.svg'))).toBe(
+        false
+      )
+    })
   })
 
   describe('getUploadRoots', () => {
