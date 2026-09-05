@@ -5,8 +5,9 @@
 // on top of this for parsing or phrasing, but never for facts, and never as the
 // only path — this parser stays the fallback.
 
+import { brandTextForms } from './chains'
 import type { AskSchema, Budget, BudgetTier, PriceLevel } from './types'
-import { AREAS, AREA_ALIASES, CUISINES, VIBES } from './vocabulary'
+import { AREAS, AREA_ALIASES, CUISINES, KNOWN_CHAIN_BRANDS, VIBES } from './vocabulary'
 
 const NUMBER_WORDS: Record<string, number> = {
   one: 1,
@@ -437,6 +438,27 @@ function parseExcludeChains(text: string, mask: boolean[]): boolean {
   return firstPresentPhrase(text, LOCAL_ONLY_PHRASES) !== null
 }
 
+/**
+ * Known brands the diner named, e.g. "is burger king open".
+ *
+ * Matching runs against a punctuation-stripped copy of the request so
+ * "wendy's" and "wendys" both land, and a brand sitting inside a negation
+ * ("anything but burger king") is not counted as a request for it.
+ */
+function parseBrands(text: string): string[] {
+  const forms = brandTextForms(text)
+  const masks = forms.map(buildNegationMask)
+
+  const found: string[] = []
+  for (const brand of KNOWN_CHAIN_BRANDS) {
+    const named = brandTextForms(brand).some((needle) =>
+      forms.some((form, i) => findPhrase(form, needle).some((hit) => !isNegated(masks[i], hit)))
+    )
+    if (named) found.push(brand)
+  }
+  return uniqueInOrder(found)
+}
+
 function parseNovelty(text: string): AskSchema['novelty'] {
   if (firstPresentPhrase(text, SURPRISE_PHRASES)) return 'surprise'
   if (firstPresentPhrase(text, FAMILIAR_PHRASES)) return 'familiar'
@@ -477,6 +499,7 @@ export function parseAskQuery(raw: string): AskSchema {
     cuisine_include: uniqueInOrder(cuisine_include).filter((c) => !excludedCuisines.includes(c)),
     cuisine_exclude: excludedCuisines,
     exclude_chains: parseExcludeChains(text, mask),
+    brands: parseBrands(text),
     vibe: kids === true && !vibe.includes('family friendly') ? [...vibe, 'family friendly'] : vibe,
     novelty: parseNovelty(text),
   }

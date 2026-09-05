@@ -84,6 +84,31 @@ describe('parseAskQuery', () => {
     })
   })
 
+  describe('named brands', () => {
+    it.each([
+      ['is burger king open right now', 'burger king'],
+      ['burger king', 'burger king'],
+      ["carrabba's tonight", 'carrabba'],
+      ['wendys drive thru', "wendy's"],
+    ])('records the brand named in %j', (query, expected) => {
+      expect(parseAskQuery(query).brands).toContain(expected)
+    })
+
+    it('leaves brands empty for a surprise ask', () => {
+      expect(parseAskQuery('surprise me').brands).toEqual([])
+    })
+
+    it('does not read a cuisine word as a brand', () => {
+      expect(parseAskQuery('somewhere for burgers').brands).toEqual([])
+      expect(parseAskQuery('cheap pizza').brands).toEqual([])
+    })
+
+    it('does not count a brand the diner ruled out', () => {
+      expect(parseAskQuery('anything but burger king').brands).toEqual([])
+      expect(parseAskQuery('no whataburger please').brands).toEqual([])
+    })
+  })
+
   describe('budget', () => {
     it.each([
       ['cheap eats tonight', 'low'],
@@ -197,6 +222,7 @@ describe('parseAskQuery', () => {
         cuisine_include: [],
         cuisine_exclude: [],
         exclude_chains: false,
+        brands: [],
         vibe: [],
         novelty: 'mixed',
       })

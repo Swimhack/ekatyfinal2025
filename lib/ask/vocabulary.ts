@@ -258,14 +258,20 @@ export const AREA_ALIASES: Record<string, string[]> = {
 }
 
 /**
- * Brands treated as chains for the "no chains" filter.
+ * Brands treated as chains for the "no chains" filter and for surprise picks.
  *
  * This is a reviewable list of multi-location brands, not a claim stored on any
  * restaurant record. The chain classifier in lib/ask/chains.ts prefers
  * evidence from our own inventory (an explicit `metadata.isChain`, or the same
  * name listed at more than one address) and falls back to this list. Because
- * "no chains" only ever removes candidates, a wrong entry costs a diner one
- * option rather than producing a false statement about a restaurant.
+ * membership here only ever removes or demotes candidates, a wrong entry costs
+ * a diner one option rather than producing a false statement about a
+ * restaurant.
+ *
+ * The same list doubles as the brand vocabulary for requests: when a diner
+ * types one of these names, lib/ask/parse.ts records it on `schema.brands` and
+ * the surprise filter stands down, because asking for Burger King by name is
+ * not a request to be surprised.
  */
 export const KNOWN_CHAIN_BRANDS: string[] = [
   "applebee's",
@@ -317,4 +323,76 @@ export const KNOWN_CHAIN_BRANDS: string[] = [
   'starbucks',
   'dunkin',
   'sonic drive-in',
+  // National fast-food and casual-dining brands. A "surprise me" ask that
+  // returns one of these is the bug this list exists to close. Each entry is
+  // written the way the brand spells itself; lib/ask/chains.ts strips
+  // punctuation on both sides before comparing, so "wendy's" matches a stored
+  // "Wendy's #1234".
+  'burger king',
+  "wendy's",
+  'kfc',
+  'kentucky fried chicken',
+  "arby's",
+  'jack in the box',
+  "hardee's",
+  "carl's jr",
+  'del taco',
+  'taco cabana',
+  'el pollo loco',
+  "church's chicken",
+  "zaxby's",
+  'dairy queen',
+  'little caesars',
+  "jersey mike's",
+  'firehouse subs',
+  "mcalister's deli",
+  "schlotzsky's",
+  'potbelly',
+  'qdoba',
+  "moe's southwest",
+  'waffle house',
+  'cracker barrel',
+  'first watch',
+  'longhorn steakhouse',
+  'red robin',
+  "cheddar's",
+  'golden corral',
+  'golden chick',
+  'hooters',
+  'twin peaks',
+  "chuy's",
+  "fuzzy's taco shop",
+  'smashburger',
+  'mooyah',
+  'long john silver',
+  "joe's crab shack",
+  'bonefish grill',
+  "maggiano's",
+  'cicis',
+  'blaze pizza',
+  "papa murphy's",
+  'peter piper pizza',
+  'einstein bros',
+  'corner bakery',
+  'nothing bundt cakes',
+  'crumbl',
+  'baskin-robbins',
+  'cold stone creamery',
+  'smoothie king',
+  'jamba',
+  'tropical smoothie',
+  'dutch bros',
+  'krispy kreme',
+  'shipley do-nuts',
+  'jollibee',
+  'yard house',
+  'dave & buster',
+  'texas de brazil',
+  'fogo de chao',
+  "ruth's chris",
+  'benihana',
+  'kura sushi',
+  'pf chang',
+  'genghis grill',
+  'which wich',
 ]

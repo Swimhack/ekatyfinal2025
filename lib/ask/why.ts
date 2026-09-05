@@ -42,6 +42,8 @@ function clauseFor(reason: MatchReason): string | null {
       return 'open now per listed hours'
     case 'no_chains':
       return 'clears your no-chains filter'
+    case 'surprise_local':
+      return 'not one of the multi-location brands we skip for a surprise'
     case 'excluded_clear':
       return reason.detail
     default:

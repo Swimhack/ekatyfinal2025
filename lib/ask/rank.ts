@@ -29,6 +29,18 @@ const GROUP_TOKENS = ['private dining', 'private events', 'large group', 'banque
 /** Tokens that indicate a listing is set up for kids. */
 const KID_TOKENS = ['family', 'kid', 'kids', 'high chair', 'playground']
 
+/**
+ * Whether a request should keep multi-location brands out of its picks.
+ *
+ * "Surprise me" is a request for something the diner has not already driven
+ * past, and a national brand is the opposite of that. A brand the diner named
+ * outright is an explicit request, so it switches this off entirely rather than
+ * second-guessing them.
+ */
+export function suppressesChainsForSurprise(schema: AskSchema): boolean {
+  return schema.novelty === 'surprise' && schema.brands.length === 0
+}
+
 export interface RankOptions {
   /** Evaluation time for `open_now`. Injected so tests are not clock-dependent. */
   now?: Date
@@ -221,6 +233,17 @@ export function applyHardFilters(
     return true
   })
 
+  // Surprise picks drop the multi-location brands outright. If that leaves
+  // fewer than three, the caller reports a shortfall — the same trade this
+  // pipeline makes everywhere else, since a national chain is the one answer a
+  // diner asking to be surprised has already ruled out.
+  if (suppressesChainsForSurprise(schema)) {
+    const independents = matched.filter((candidate) => !chainIndex.ids.has(candidate.id))
+    const dropped = matched.length - independents.length
+    if (dropped > 0) removedBy.surprise_chains = dropped
+    return { matched: independents, removedBy, chainIndex, openStates }
+  }
+
   return { matched, removedBy, chainIndex, openStates }
 }
 
@@ -387,6 +410,16 @@ export function scoreCandidate(
     if (candidate.featured) noveltyWeight -= 0.5
     noveltyWeight -= Math.min(0.8, candidate.reviewCount / 500)
     noveltyWeight += seededUnit(context.seed || 'ask', candidate.id) * 1.5
+
+    // Cites the surprise filter this candidate cleared, so the why-line can
+    // name the constraint instead of implying the place is a hidden gem.
+    if (suppressesChainsForSurprise(schema) && context.chainIndex) {
+      addReason({
+        kind: 'surprise_local',
+        detail: 'not one of the multi-location brands we screen out',
+        weight: 0.75,
+      })
+    }
   } else {
     if (rating !== null) noveltyWeight += Math.max(0, Math.min(0.9, (rating - 3.5) * 0.6))
   }

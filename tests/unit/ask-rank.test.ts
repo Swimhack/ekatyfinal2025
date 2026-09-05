@@ -127,6 +127,25 @@ const POOL: AskCandidate[] = [
     address: '2 Cinco Ranch Blvd',
     rating: 4.0,
   }),
+  // National brands, the kind a "surprise me" ask should not lead with.
+  candidate({
+    name: 'Burger King',
+    categories: ['Burgers', 'Fast Food'],
+    cuisineTypes: ['Burgers', 'American'],
+    priceLevel: 'BUDGET',
+    zipCode: '77494',
+    rating: 3.6,
+    reviewCount: 40,
+  }),
+  candidate({
+    name: "Carrabba's Italian Grill",
+    categories: ['Italian'],
+    cuisineTypes: ['Italian', 'Pasta'],
+    priceLevel: 'MODERATE',
+    zipCode: '77450',
+    rating: 4.1,
+    reviewCount: 60,
+  }),
 ]
 
 const POOL_IDS = new Set(POOL.map((c) => c.id))
@@ -171,6 +190,62 @@ describe('applyHardFilters', () => {
     const flags = new Map([['republic-katy', false], ['republic-cinco', false]])
     const { matched } = applyHardFilters(POOL, parseAskQuery('no chains'), {}, flags)
     expect(matched.filter((c) => c.name === 'The Republic Grille')).toHaveLength(2)
+  })
+
+  describe('surprise picks', () => {
+    it('drops national chains from a bare "surprise me"', () => {
+      const { matched, removedBy } = applyHardFilters(POOL, parseAskQuery('surprise me'))
+      const names = matched.map((c) => c.name)
+
+      expect(names).not.toContain('Burger King')
+      expect(names).not.toContain("Carrabba's Italian Grill")
+      expect(names).not.toContain("Torchy's Tacos")
+      expect(removedBy.surprise_chains).toBeGreaterThan(0)
+    })
+
+    it('drops the brand our own inventory lists at two addresses as well', () => {
+      const { matched } = applyHardFilters(POOL, parseAskQuery('somewhere new'))
+      expect(matched.map((c) => c.name)).not.toContain('The Republic Grille')
+    })
+
+    it('respects an explicit metadata.isChain override on a surprise ask', () => {
+      const flags = new Map([['republic-katy', false], ['republic-cinco', false]])
+      const { matched } = applyHardFilters(POOL, parseAskQuery('surprise me'), {}, flags)
+      expect(matched.filter((c) => c.name === 'The Republic Grille')).toHaveLength(2)
+    })
+
+    it('still excludes chains when a surprise ask also names a cuisine', () => {
+      const { matched } = applyHardFilters(POOL, parseAskQuery('surprise me, something italian'))
+      const names = matched.map((c) => c.name)
+
+      expect(names).toContain('Antonia Cucina Italiana')
+      expect(names).not.toContain("Carrabba's Italian Grill")
+    })
+
+    it('keeps the chain when the diner named the brand', () => {
+      const { matched, removedBy } = applyHardFilters(POOL, parseAskQuery('surprise me with burger king'))
+
+      expect(matched.map((c) => c.name)).toContain('Burger King')
+      expect(removedBy.surprise_chains).toBeUndefined()
+    })
+
+    it('leaves a non-surprise cuisine ask alone', () => {
+      const { matched, removedBy } = applyHardFilters(POOL, parseAskQuery('burgers'))
+
+      expect(matched.map((c) => c.name)).toContain('Burger King')
+      expect(removedBy.surprise_chains).toBeUndefined()
+    })
+
+    it('excludes the chain even when that leaves the pool short', () => {
+      const thin = [
+        candidate({ name: 'Burger King', categories: ['Burgers'], cuisineTypes: ['Burgers'] }),
+        candidate({ name: 'Sushi Hana', categories: ['Sushi'], cuisineTypes: ['Sushi'] }),
+      ]
+      const { matched, removedBy } = applyHardFilters(thin, parseAskQuery('surprise me'))
+
+      expect(matched.map((c) => c.name)).toEqual(['Sushi Hana'])
+      expect(removedBy.surprise_chains).toBe(1)
+    })
   })
 
   it('enforces an explicit dollar ceiling as a hard cap', () => {
@@ -299,6 +374,52 @@ describe('runAsk', () => {
         expect(POOL.some((c) => c.name === pick.name && c.slug === pick.slug)).toBe(true)
       }
     }
+  })
+
+  describe('surprise me', () => {
+    it('never answers with a national chain', () => {
+      for (const query of ['surprise me', 'surprise us', 'somewhere new', 'something different']) {
+        const names = runAsk(query, POOL).picks.map((pick) => pick.name)
+
+        expect(names).not.toContain('Burger King')
+        expect(names).not.toContain("Carrabba's Italian Grill")
+        expect(names).not.toContain("Torchy's Tacos")
+        expect(names).not.toContain('The Republic Grille')
+      }
+    })
+
+    it('fills all three picks from independents', () => {
+      const result = runAsk('surprise me', POOL)
+
+      expect(result.picks).toHaveLength(3)
+      expect(result.shortfall).toBeNull()
+    })
+
+    it('still answers an explicit brand ask with that brand', () => {
+      const result = runAsk('burger king', POOL)
+      expect(result.picks.map((pick) => pick.name)).toContain('Burger King')
+    })
+
+    it('reports a shortfall rather than padding with a chain', () => {
+      const thin = [
+        candidate({ name: 'Burger King', categories: ['Burgers'], cuisineTypes: ['Burgers'] }),
+        candidate({ name: 'Tita Taco House', categories: ['Mexican'], cuisineTypes: ['Tacos'] }),
+      ]
+      const result = runAsk('surprise me', thin)
+
+      expect(result.picks.map((pick) => pick.name)).toEqual(['Tita Taco House'])
+      expect(result.shortfall?.returned).toBe(1)
+      expect(result.shortfall?.limiting_filters).toContain(
+        'skipping the multi-location brands for a surprise'
+      )
+    })
+
+    it('ties the why-line to the filter we applied, with no social proof', () => {
+      for (const pick of runAsk('surprise me', POOL).picks) {
+        expect(pick.why).toMatch(/multi-location brands|off the beaten path|usual suspects/i)
+        expect(pick.why).not.toMatch(/independent|locally owned|family owned|hidden gem/i)
+      }
+    })
   })
 
   it('reports a shortfall instead of padding when fewer than three match', () => {
