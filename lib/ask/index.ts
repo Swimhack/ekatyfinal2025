@@ -20,8 +20,15 @@ import {
 
 export * from './types'
 export { parseAskQuery, budgetCeiling, budgetMaxPriceLevel, budgetTier, normalizeQuery } from './parse'
-export { rankCandidates, applyHardFilters, scoreCandidate, zipCentroid, DEFAULT_PICK_COUNT } from './rank'
-export { buildChainIndex, isChain } from './chains'
+export {
+  rankCandidates,
+  applyHardFilters,
+  scoreCandidate,
+  suppressesChainsForSurprise,
+  zipCentroid,
+  DEFAULT_PICK_COUNT,
+} from './rank'
+export { buildChainIndex, findBrandMentions, isChain } from './chains'
 export { isOpenAt, katyLocalNow } from './hours'
 export { buildWhyLine } from './why'
 
@@ -32,6 +39,7 @@ const FILTER_LABELS: Record<string, string> = {
   cuisine_include: 'the cuisine you asked for',
   cuisine_exclude: 'the cuisines you ruled out',
   exclude_chains: 'no chains',
+  surprise_chains: 'skipping the multi-location brands for a surprise',
   budget_ceiling: 'your price ceiling',
   open_now: 'open right now',
 }

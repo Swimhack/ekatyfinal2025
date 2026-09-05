@@ -24,6 +24,13 @@ export interface AskSchema {
   cuisine_exclude: string[]
   /** "no chains" / "local only". Hard filter against the chain classifier. */
   exclude_chains: boolean
+  /**
+   * Known multi-location brands the diner named, e.g. "burger king".
+   *
+   * A named brand is an explicit request, so it switches off the chain
+   * suppression that a `surprise` ask would otherwise apply.
+   */
+  brands: string[]
   /** Named Katy area matched against listing addresses, e.g. "Cinco Ranch". */
   area?: string
   /** 5-digit ZIP mentioned in the request. */
@@ -79,6 +86,7 @@ export type MatchReasonKind =
   | 'party_size'
   | 'open_now'
   | 'no_chains'
+  | 'surprise_local'
   | 'excluded_clear'
 
 /**

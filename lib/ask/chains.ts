@@ -21,7 +21,7 @@ export interface ChainIndex {
 }
 
 /** Lowercases and strips punctuation so "Pappas Bar-B-Q" ≈ "pappas bar b q". */
-function normalizeName(name: string): string {
+export function normalizeBrandText(name: string): string {
   return name
     .toLowerCase()
     .replace(/[\u2018\u2019\u02bc]/g, "'")
@@ -29,9 +29,23 @@ function normalizeName(name: string): string {
     .trim()
 }
 
+/**
+ * The spellings a brand can appear in once punctuation is gone.
+ *
+ * "Wendy's" reduces to "wendy s", but diners and listings both write "Wendys",
+ * so an apostrophe-free form is carried alongside it.
+ */
+export function brandTextForms(value: string): string[] {
+  const spaced = normalizeBrandText(value)
+  const contracted = normalizeBrandText(value.replace(/['\u2018\u2019\u02bc]/g, ''))
+  return spaced === contracted ? [spaced] : [spaced, contracted]
+}
+
 function matchesKnownBrand(name: string): boolean {
-  const normalized = normalizeName(name)
-  return KNOWN_CHAIN_BRANDS.some((brand) => normalized.includes(normalizeName(brand)))
+  const nameForms = brandTextForms(name)
+  return KNOWN_CHAIN_BRANDS.some((brand) =>
+    brandTextForms(brand).some((needle) => nameForms.some((form) => form.includes(needle)))
+  )
 }
 
 /**
@@ -44,7 +58,7 @@ export function buildChainIndex(
 ): ChainIndex {
   const addressesByName = new Map<string, Set<string>>()
   for (const candidate of candidates) {
-    const key = normalizeName(candidate.name)
+    const key = normalizeBrandText(candidate.name)
     const addresses = addressesByName.get(key) || new Set<string>()
     addresses.add(`${candidate.address.toLowerCase().trim()}|${candidate.zipCode}`)
     addressesByName.set(key, addresses)
@@ -61,7 +75,7 @@ export function buildChainIndex(
     }
     if (explicit === false) continue
 
-    const locations = addressesByName.get(normalizeName(candidate.name))
+    const locations = addressesByName.get(normalizeBrandText(candidate.name))
     if (locations && locations.size > 1) {
       index.ids.add(candidate.id)
       index.evidence.set(candidate.id, 'multi_location')
@@ -79,4 +93,19 @@ export function buildChainIndex(
 
 export function isChain(index: ChainIndex, candidateId: string): boolean {
   return index.ids.has(candidateId)
+}
+
+/**
+ * Which known brands a diner named in their request.
+ *
+ * Matching is whole-word against the punctuation-stripped request, so "bk" does
+ * not stand in for Burger King and "burger" alone stays a cuisine word. A hit
+ * is the diner asking for that brand by name, which is what tells the surprise
+ * filter to stand down.
+ */
+export function findBrandMentions(text: string): string[] {
+  const forms = brandTextForms(text).map((form) => ` ${form} `)
+  return KNOWN_CHAIN_BRANDS.filter((brand) =>
+    brandTextForms(brand).some((needle) => forms.some((form) => form.includes(` ${needle} `)))
+  )
 }
