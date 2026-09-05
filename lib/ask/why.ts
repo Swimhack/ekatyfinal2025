@@ -16,6 +16,8 @@ const CLAUSE_SEPARATOR = ' · '
 /** Turns one cited match into a clause. Every branch restates stored data. */
 function clauseFor(reason: MatchReason): string | null {
   switch (reason.kind) {
+    case 'brand':
+      return `the ${reason.detail} you asked for by name`
     case 'cuisine':
       return `listed under ${reason.detail}`
     case 'budget':

@@ -96,6 +96,22 @@ export function isChain(index: ChainIndex, candidateId: string): boolean {
 }
 
 /**
+ * Whether a listing is the brand the diner named.
+ *
+ * Whole-word against the punctuation-stripped name, so "Burger King #4" and
+ * "McDonald's (To Go only)" both answer to the brand while "Build-a-Burger"
+ * and "Smashburger" do not. This is the promotion path for an explicit brand
+ * request, so it is deliberately stricter than the substring test the chain
+ * classifier uses to decide what a "no chains" filter should remove.
+ */
+export function nameCarriesBrand(name: string, brand: string): boolean {
+  const nameForms = brandTextForms(name).map((form) => ` ${form} `)
+  return brandTextForms(brand).some((needle) =>
+    nameForms.some((form) => form.includes(` ${needle} `))
+  )
+}
+
+/**
  * Which known brands a diner named in their request.
  *
  * Matching is whole-word against the punctuation-stripped request, so "bk" does

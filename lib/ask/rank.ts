@@ -8,7 +8,7 @@
 //   2. Soft scoring for fit (budget tier, proximity, vibe, kids, party size,
 //      novelty), which only reorders what already passed.
 
-import { buildChainIndex, type ChainIndex } from './chains'
+import { buildChainIndex, nameCarriesBrand, type ChainIndex } from './chains'
 import { isOpenAt, type OpenState } from './hours'
 import { budgetCeiling, budgetMaxPriceLevel, budgetTargetPriceLevel, budgetTier } from './parse'
 import {
@@ -39,6 +39,36 @@ const KID_TOKENS = ['family', 'kid', 'kids', 'high chair', 'playground']
  */
 export function suppressesChainsForSurprise(schema: AskSchema): boolean {
   return schema.novelty === 'surprise' && schema.brands.length === 0
+}
+
+/**
+ * Weight carried by a listing the diner named outright.
+ *
+ * Sized above any single soft signal so the named brand's why-line leads with
+ * the name, but the ordering guarantee comes from the sort in
+ * `rankCandidates` rather than from this number winning an arithmetic race.
+ */
+export const EXPLICIT_BRAND_WEIGHT = 6
+
+/**
+ * The listings that carry a brand the diner named, e.g. every Burger King row
+ * for "burger king".
+ *
+ * A named brand is the most specific thing a diner can say, so these ids are
+ * what the rest of the pipeline treats as explicit intent: they are exempt
+ * from the cuisine and chain filters that infer intent from looser wording,
+ * and they sort ahead of everything else.
+ */
+export function brandMatchIds(candidates: AskCandidate[], schema: AskSchema): Set<string> {
+  const ids = new Set<string>()
+  if (schema.brands.length === 0) return ids
+
+  for (const candidate of candidates) {
+    if (schema.brands.some((brand) => nameCarriesBrand(candidate.name, brand))) {
+      ids.add(candidate.id)
+    }
+  }
+  return ids
 }
 
 export interface RankOptions {
@@ -166,6 +196,8 @@ export interface HardFilterResult {
   removedBy: Record<string, number>
   chainIndex: ChainIndex
   openStates: Map<string, OpenState>
+  /** Candidate ids carrying a brand the diner named. */
+  brandMatches: Set<string>
 }
 
 /**
@@ -180,6 +212,7 @@ export function applyHardFilters(
 ): HardFilterResult {
   const now = options.now || new Date()
   const chainIndex = buildChainIndex(candidates, explicitChainFlags)
+  const brandMatches = brandMatchIds(candidates, schema)
   const openStates = new Map<string, OpenState>()
 
   const removedBy: Record<string, number> = {}
@@ -195,7 +228,12 @@ export function applyHardFilters(
   // rejected it, with the usually-narrowest constraint checked first. That
   // keeps the shortfall message pointed at the filter worth loosening.
   const matched = candidates.filter((candidate) => {
-    if (includeTokenGroups.length > 0) {
+    // The diner named this listing. Cuisine wording and the chain filter are
+    // both inferences about what they meant, and neither gets to overrule the
+    // name they typed. Price, hours and ruled-out cuisines still apply.
+    const namedBrand = brandMatches.has(candidate.id)
+
+    if (includeTokenGroups.length > 0 && !namedBrand) {
       const fit = fitText(candidate)
       const matchesAny = includeTokenGroups.some((tokens) =>
         tokens.some((token) => containsToken(fit, token))
@@ -211,7 +249,7 @@ export function applyHardFilters(
       return false
     }
 
-    if (schema.exclude_chains && chainIndex.ids.has(candidate.id)) {
+    if (schema.exclude_chains && !namedBrand && chainIndex.ids.has(candidate.id)) {
       remove('exclude_chains')
       return false
     }
@@ -241,10 +279,10 @@ export function applyHardFilters(
     const independents = matched.filter((candidate) => !chainIndex.ids.has(candidate.id))
     const dropped = matched.length - independents.length
     if (dropped > 0) removedBy.surprise_chains = dropped
-    return { matched: independents, removedBy, chainIndex, openStates }
+    return { matched: independents, removedBy, chainIndex, openStates, brandMatches }
   }
 
-  return { matched, removedBy, chainIndex, openStates }
+  return { matched, removedBy, chainIndex, openStates, brandMatches }
 }
 
 /**
@@ -260,6 +298,8 @@ export function scoreCandidate(
     chainIndex?: ChainIndex
     openState?: OpenState
     seed?: string
+    /** This listing carries a brand named in the request. */
+    namedBrand?: boolean
   } = {}
 ): { score: number; reasons: MatchReason[] } {
   const reasons: MatchReason[] = []
@@ -267,6 +307,13 @@ export function scoreCandidate(
   const address = normalizeText(candidate.address)
   const addReason = (reason: MatchReason) => {
     if (reason.weight !== 0) reasons.push(reason)
+  }
+
+  // The brand the diner asked for by name. Cited as the listing's own stored
+  // name, so the why-line restates what we hold rather than the spelling the
+  // diner happened to type.
+  if (context.namedBrand) {
+    addReason({ kind: 'brand', detail: candidate.name, weight: EXPLICIT_BRAND_WEIGHT })
   }
 
   // Requested cuisine. Already guaranteed by the hard filter; scored so the
@@ -386,7 +433,9 @@ export function scoreCandidate(
     addReason({ kind: 'open_now', detail: 'open now per listed hours', weight: 1 })
   }
 
-  if (schema.exclude_chains) {
+  // A listing kept because the diner named it has not cleared the no-chains
+  // filter — it was exempted from it — so it never claims to have.
+  if (schema.exclude_chains && !context.namedBrand) {
     addReason({ kind: 'no_chains', detail: 'clears your no-chains filter', weight: 0.75 })
   }
 
@@ -452,7 +501,7 @@ export function rankCandidates(
   explicitChainFlags?: Map<string, boolean>
 ): RankResult {
   const limit = options.limit ?? DEFAULT_PICK_COUNT
-  const { matched, removedBy, chainIndex, openStates } = applyHardFilters(
+  const { matched, removedBy, chainIndex, openStates, brandMatches } = applyHardFilters(
     candidates,
     schema,
     options,
@@ -472,10 +521,18 @@ export function rankCandidates(
         chainIndex,
         openState,
         seed: options.seed,
+        namedBrand: brandMatches.has(candidate.id),
       })
       return { candidate, score, reasons, openState }
     })
     .sort((a, b) => {
+      // A brand the diner named leads, whatever else scored. Soft signals
+      // decide the order among the brand's own locations and among everything
+      // else, but they never push the named brand out of the picks.
+      const brandDiff =
+        Number(brandMatches.has(b.candidate.id)) - Number(brandMatches.has(a.candidate.id))
+      if (brandDiff !== 0) return brandDiff
+
       if (b.score !== a.score) return b.score - a.score
       const ratingDiff = (b.candidate.rating || 0) - (a.candidate.rating || 0)
       if (ratingDiff !== 0) return ratingDiff

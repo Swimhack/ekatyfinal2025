@@ -23,12 +23,14 @@ export { parseAskQuery, budgetCeiling, budgetMaxPriceLevel, budgetTier, normaliz
 export {
   rankCandidates,
   applyHardFilters,
+  brandMatchIds,
   scoreCandidate,
   suppressesChainsForSurprise,
   zipCentroid,
   DEFAULT_PICK_COUNT,
+  EXPLICIT_BRAND_WEIGHT,
 } from './rank'
-export { buildChainIndex, findBrandMentions, isChain } from './chains'
+export { buildChainIndex, findBrandMentions, isChain, nameCarriesBrand } from './chains'
 export { isOpenAt, katyLocalNow } from './hours'
 export { buildWhyLine } from './why'
 

@@ -27,8 +27,10 @@ export interface AskSchema {
   /**
    * Known multi-location brands the diner named, e.g. "burger king".
    *
-   * A named brand is an explicit request, so it switches off the chain
-   * suppression that a `surprise` ask would otherwise apply.
+   * A named brand is an explicit request. Listings carrying it lead the picks,
+   * are exempt from the cuisine and chain filters that infer intent from
+   * looser wording, and switch off the chain suppression a `surprise` ask
+   * would otherwise apply.
    */
   brands: string[]
   /** Named Katy area matched against listing addresses, e.g. "Cinco Ranch". */
@@ -74,6 +76,7 @@ export interface AskCandidate {
 }
 
 export type MatchReasonKind =
+  | 'brand'
   | 'cuisine'
   | 'budget'
   | 'budget_cap'
