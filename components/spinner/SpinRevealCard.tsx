@@ -95,7 +95,7 @@ export default function SpinRevealCard({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-end justify-center bg-charcoal-950/85 p-0 backdrop-blur-sm sm:items-center sm:p-6 ${
+      className={`fixed inset-0 z-[70] flex items-end justify-center bg-charcoal-950/90 p-0 backdrop-blur-sm sm:items-center sm:p-6 ${
         reducedMotion ? '' : 'animate-reveal-fade'
       }`}
       role="dialog"
@@ -106,7 +106,7 @@ export default function SpinRevealCard({
       }}
     >
       <div
-        className={`relative flex max-h-[100dvh] w-full max-w-lg flex-col overflow-y-auto rounded-t-3xl bg-bone-50 shadow-2xl sm:max-h-[90vh] sm:rounded-3xl ${
+        className={`relative flex max-h-[100dvh] w-full max-w-lg flex-col overflow-y-auto rounded-t-3xl bg-bone-50 shadow-[0_28px_70px_-12px_rgba(9,8,7,0.9)] ring-1 ring-honey-400/30 sm:max-h-[90vh] sm:rounded-3xl ${
           reducedMotion ? '' : 'animate-reveal-rise'
         }`}
       >
@@ -114,7 +114,7 @@ export default function SpinRevealCard({
           ref={closeRef}
           onClick={onClose}
           aria-label="Close result"
-          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white transition hover:bg-black/65"
+          className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-charcoal-950/85 text-bone-50 ring-1 ring-honey-400/40 transition hover:bg-charcoal-950"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -128,19 +128,27 @@ export default function SpinRevealCard({
             className="h-52 w-full sm:h-60"
             captionInset
           />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+          <div className="reveal-scrim pointer-events-none absolute inset-0" />
+        </div>
 
-          <div className="absolute inset-x-0 bottom-0 p-5">
+        {/* The plate stays in normal flow and is pulled up over the photo, so a
+            long name that wraps to three lines grows downward instead of
+            spilling out of the top of the image. */}
+        <div className="relative z-10 -mt-14 px-4 sm:-mt-16 sm:px-5">
+          <div className="reveal-name-plate rounded-2xl px-4 py-3 sm:px-5 sm:py-4">
             <p className="mb-1 text-[0.7rem] font-bold uppercase tracking-[0.22em] text-honey-300">
               Spin #{spinNumber} · Tonight you&apos;re eating at
             </p>
-            <h2 id="spin-reveal-name" className="text-3xl font-black leading-tight text-white drop-shadow sm:text-4xl">
+            <h2
+              id="spin-reveal-name"
+              className="text-[2rem] font-black leading-[1.08] text-bone-50 sm:text-[2.5rem]"
+            >
               {restaurant.name}
             </h2>
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-4 p-5 pt-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             {cuisine && (
               <span className="rounded-full bg-sage-100 px-3 py-1 font-semibold capitalize text-sage-700">
