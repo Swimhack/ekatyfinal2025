@@ -3,7 +3,7 @@ import { getRestaurantDetail } from '@/lib/restaurant-detail'
 import {
   OG_IMAGE_HEIGHT,
   OG_IMAGE_WIDTH,
-  primaryCuisine,
+  displayCuisine,
   siteUrl,
 } from '@/lib/seo/restaurant-og'
 
@@ -36,7 +36,7 @@ export async function GET(
     if (!restaurant) return new NextResponse('Not found', { status: 404 })
 
     name = restaurant.name
-    const cuisine = primaryCuisine(restaurant)
+    const cuisine = displayCuisine(restaurant)
     subtitle = [cuisine, [restaurant.city, restaurant.state].filter(Boolean).join(', ')]
       .filter(Boolean)
       .join(' · ')

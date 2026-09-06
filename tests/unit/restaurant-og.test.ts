@@ -1,6 +1,7 @@
 import {
   buildRestaurantDescription,
   buildRestaurantTitle,
+  displayCuisine,
   isUsableOgImage,
   parsePhotoCandidates,
   pickOgImage,
@@ -58,6 +59,17 @@ describe('primaryCuisine', () => {
 
   it('returns null when every tag is generic', () => {
     expect(primaryCuisine({ ...base, categories: ['Restaurant', 'Food'] })).toBeNull()
+  })
+})
+
+describe('displayCuisine', () => {
+  it('capitalises a lower-case mood tag so the title does not read "upscale Restaurant"', () => {
+    expect(displayCuisine({ ...base, cuisineTypes: ['upscale', 'date-night'] })).toBe('Upscale')
+  })
+
+  it('leaves a tag that already carries capitals alone', () => {
+    expect(displayCuisine({ ...base, cuisineTypes: ['BBQ'] })).toBe('BBQ')
+    expect(displayCuisine({ ...base, cuisineTypes: ['Tex-Mex'] })).toBe('Tex-Mex')
   })
 })
 

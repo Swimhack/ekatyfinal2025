@@ -250,8 +250,20 @@ export function primaryCuisine(restaurant: RestaurantOgInput): string | null {
   return named ?? null
 }
 
-export function buildRestaurantTitle(restaurant: RestaurantOgInput): string {
+/**
+ * The cuisine as it should appear in a title or on a card. Some rows hold
+ * lower-case mood tags ("upscale", "brunch"), and "upscale Restaurant in Katy,
+ * TX" looks broken in a search result. Tags already carrying capitals ("BBQ",
+ * "Tex-Mex") are left alone.
+ */
+export function displayCuisine(restaurant: RestaurantOgInput): string | null {
   const cuisine = primaryCuisine(restaurant)
+  if (!cuisine) return null
+  return cuisine === cuisine.toLowerCase() ? cuisine[0].toUpperCase() + cuisine.slice(1) : cuisine
+}
+
+export function buildRestaurantTitle(restaurant: RestaurantOgInput): string {
+  const cuisine = displayCuisine(restaurant)
   const zip = restaurant.zipCode ? ` ${restaurant.zipCode}` : ''
   return `${restaurant.name} | ${cuisine ? `${cuisine} ` : ''}Restaurant in Katy, TX${zip}`
 }
