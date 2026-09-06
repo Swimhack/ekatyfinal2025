@@ -921,3 +921,174 @@ describe('date night asks', () => {
     }
   })
 })
+
+// Rows the places import left behind: a barbershop, a med spa and a home
+// rental, all carrying "Restaurant" in their stored categories, next to real
+// restaurants whose names or menus use the same words innocently.
+const JUNK_POOL: AskCandidate[] = [
+  candidate({
+    name: "Antonia's Restaurant",
+    categories: ['Food', 'Restaurant', 'Italian'],
+    cuisineTypes: ['Italian'],
+    tags: ['patio', 'family'],
+    rating: 4.4,
+    reviewCount: 1169,
+  }),
+  candidate({
+    name: 'Katy Patio Cantina',
+    categories: ['Mexican', 'Restaurant'],
+    cuisineTypes: ['Mexican'],
+    tags: ['patio', 'family'],
+    rating: 4.3,
+  }),
+  candidate({
+    name: 'BruceFamilycuts',
+    categories: ['Restaurant'],
+    cuisineTypes: ['American'],
+    tags: ['family'],
+    description: 'BruceFamilycuts is a popular restaurant in Katy, Texas.',
+    rating: 4.9,
+    reviewCount: 41,
+  }),
+  candidate({
+    name: 'SUPERCUTS',
+    categories: ['Restaurant'],
+    cuisineTypes: ['American'],
+    tags: ['family'],
+    rating: 4.6,
+  }),
+  candidate({
+    name: 'Sport Clips Haircuts of Fulshear',
+    categories: ['Restaurant'],
+    tags: ['family'],
+    rating: 4.5,
+  }),
+  candidate({
+    name: 'Amerejuve MedSpa, Katy TX - Laser Hair Removal & Botox Katy',
+    categories: ['Restaurant'],
+    tags: ['family'],
+    rating: 4.8,
+  }),
+  candidate({
+    name: 'Honey Farm Rentals',
+    categories: ['Restaurant'],
+    cuisineTypes: ['American'],
+    tags: ['family'],
+    description: 'Family-owned farm offering rooms with homey decor & an apartment in a converted barn.',
+    rating: 4.9,
+    reviewCount: 35,
+  }),
+  // The traps. Every one of these is a real kitchen whose name or menu uses a
+  // word from the junk lists.
+  candidate({
+    name: "Jersey Mike's Subs",
+    categories: ['Sandwiches', 'Restaurant'],
+    cuisineTypes: ['Sandwiches'],
+    description: 'Sub sandwich chain slicing cold cuts to order.',
+    tags: ['family'],
+    rating: 4.2,
+  }),
+  candidate({
+    name: 'Maple Street Biscuit Company',
+    categories: ['Breakfast', 'Restaurant'],
+    cuisineTypes: ['Breakfast'],
+    tags: ['family', 'patio'],
+    rating: 4.5,
+  }),
+  candidate({
+    name: 'Texas Shaved Ice Express',
+    categories: ['Dessert'],
+    tags: ['family'],
+    rating: 4.7,
+  }),
+  candidate({
+    name: 'Cacao Brownie',
+    categories: ['Bakery', 'Dessert'],
+    tags: ['family'],
+    rating: 4.6,
+  }),
+  candidate({
+    name: 'Raspados El Oasis',
+    categories: ['Mexican', 'Dessert'],
+    tags: ['family'],
+    rating: 4.4,
+  }),
+  candidate({
+    name: 'Old Hickory Inn Barbecue',
+    categories: ['BBQ', 'Restaurant'],
+    cuisineTypes: ['Barbecue'],
+    tags: ['family', 'patio'],
+    rating: 4.5,
+  }),
+]
+
+describe('listings that are not places to eat', () => {
+  it('drops a barbershop that our own categories call a Restaurant', () => {
+    const { matched, removedBy } = applyHardFilters(JUNK_POOL, parseAskQuery('patio kids'))
+    const names = matched.map((c) => c.name)
+
+    expect(names).not.toContain('BruceFamilycuts')
+    expect(names).not.toContain('SUPERCUTS')
+    expect(names).not.toContain('Sport Clips Haircuts of Fulshear')
+    expect(removedBy.non_restaurant).toBeGreaterThanOrEqual(3)
+  })
+
+  it('drops a med spa and a home rental the same way', () => {
+    const { matched } = applyHardFilters(JUNK_POOL, parseAskQuery('patio kids'))
+    const names = matched.map((c) => c.name)
+
+    expect(names).not.toContain('Amerejuve MedSpa, Katy TX - Laser Hair Removal & Botox Katy')
+    expect(names).not.toContain('Honey Farm Rentals')
+  })
+
+  it('keeps a deli that describes its cold cuts', () => {
+    const { matched } = applyHardFilters(JUNK_POOL, parseAskQuery('kid friendly'))
+    expect(matched.map((c) => c.name)).toContain("Jersey Mike's Subs")
+  })
+
+  it('keeps the kitchens whose names only look like the junk words', () => {
+    const kept = applyHardFilters(JUNK_POOL, parseAskQuery('kid friendly')).matched.map((c) => c.name)
+
+    for (const name of [
+      'Maple Street Biscuit Company',
+      'Texas Shaved Ice Express',
+      'Cacao Brownie',
+      'Raspados El Oasis',
+      'Old Hickory Inn Barbecue',
+    ]) {
+      expect(kept).toContain(name)
+    }
+  })
+
+  it('answers "patio kids" with restaurants, however well the junk scored', () => {
+    const names = runAsk('patio kids', JUNK_POOL).picks.map((pick) => pick.name)
+
+    expect(names).not.toContain('BruceFamilycuts')
+    expect(names).not.toContain('Honey Farm Rentals')
+    expect(names).toContain("Antonia's Restaurant")
+    expect(names).toHaveLength(3)
+  })
+
+  it('answers a haircut ask with nothing rather than a barbershop', () => {
+    const result = runAsk('haircut', JUNK_POOL)
+    const names = result.picks.map((pick) => pick.name)
+
+    expect(names).not.toContain('BruceFamilycuts')
+    expect(names).not.toContain('SUPERCUTS')
+    expect(names).not.toContain('Sport Clips Haircuts of Fulshear')
+  })
+
+  it('names the filter in plain English when it causes a shortfall', () => {
+    const pool = [JUNK_POOL.find((c) => c.name === 'BruceFamilycuts') as AskCandidate]
+    const { shortfall } = runAsk('kid friendly', pool)
+
+    expect(shortfall?.limiting_filters).toContain('skipping listings that are not places to eat')
+    expect(shortfall?.message).not.toContain('non_restaurant')
+  })
+
+  it('leaves the date-night, surprise and named-brand paths untouched', () => {
+    expect(runAsk('date night', POOL).picks).toHaveLength(3)
+    expect(runAsk('surprise me', POOL).picks.length).toBeGreaterThan(0)
+    expect(runAsk('burger king', POOL).picks[0].name).toBe('Burger King')
+  })
+})

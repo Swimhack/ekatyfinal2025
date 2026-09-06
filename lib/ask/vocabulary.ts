@@ -363,6 +363,48 @@ export const NON_RESTAURANT_TOKENS: string[] = [
 ]
 
 /**
+ * The same idea for barbershops, salons and med spas, matched against a
+ * listing's name and slug only.
+ *
+ * These words are safe in a name and treacherous in a description: Jersey
+ * Mike's describes its cold cuts, a snow-cone stand describes shaved ice, and
+ * a bakery describes its brownies. Reading only what the business calls itself
+ * is what lets "cuts" drop BruceFamilycuts and SUPERCUTS without touching a
+ * deli.
+ *
+ * Entries are also chosen to survive substring matching, since that is how
+ * these are compared. "cuts" cannot occur inside "biscuits" or "coconuts", so
+ * it is safe, while bare "clips" hides in "eclipse", "lash" in "splash",
+ * "spa" in "raspados", "brow" in "brownie" and "cut" in "executive" — so those
+ * are spelled out as the longer phrase or the brand instead.
+ */
+export const NON_RESTAURANT_NAME_TOKENS: string[] = [
+  'barber',
+  'salon',
+  'cuts',
+  'haircut',
+  'hairstyl',
+  'hair studio',
+  'hair design',
+  'hair removal',
+  'great clips',
+  'sport clips',
+  'medspa',
+  'med spa',
+  'day spa',
+  'nail spa',
+  'nail bar',
+  'massage',
+  'waxing',
+  'eyelash',
+  'lash bar',
+  'brow bar',
+  'blow dry',
+  'tanning',
+  'botox',
+]
+
+/**
  * Katy-area place names. These are only ever matched against the `address`
  * column of existing listings, so an area that is not in our data simply does
  * not match — we never map an area to coordinates we made up.
