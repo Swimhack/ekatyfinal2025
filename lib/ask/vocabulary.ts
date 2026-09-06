@@ -333,6 +333,36 @@ export const SIT_DOWN_TOKENS: string[] = [
 export const NON_SIT_DOWN_BRANDS: string[] = ['eskimo hut']
 
 /**
+ * Name/slug/description tokens that mean the listing is not a place to eat.
+ *
+ * Reviewable code list only — never written into Neon. Ask hard-filters these
+ * out of every pick so lodging, rentals and other non-restaurants that were
+ * miscategorized as Restaurant cannot answer a dining ask. Prefer specific
+ * tokens ("rentals", "motel") over broad ones ("farm") so real kitchens stay.
+ */
+export const NON_RESTAURANT_TOKENS: string[] = [
+  'rentals',
+  'rental',
+  'vacation rental',
+  'vacation rentals',
+  'bed and breakfast',
+  'bed & breakfast',
+  'hotel',
+  'motel',
+  'apartments',
+  'apartment',
+  'self storage',
+  'storage units',
+  'real estate',
+  'car wash',
+  'daycare',
+  'day care',
+  'rv park',
+  'trailer park',
+  'airbnb',
+]
+
+/**
  * Katy-area place names. These are only ever matched against the `address`
  * column of existing listings, so an area that is not in our data simply does
  * not match — we never map an area to coordinates we made up.

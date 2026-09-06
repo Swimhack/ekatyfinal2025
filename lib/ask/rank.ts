@@ -22,6 +22,7 @@ import {
 import {
   AREA_ALIASES,
   CUISINES,
+  NON_RESTAURANT_TOKENS,
   NON_SIT_DOWN_BRANDS,
   SERVICE_FORMATS,
   SIT_DOWN_TOKENS,
@@ -305,6 +306,18 @@ export interface HardFilterResult {
  * Applies every non-negotiable constraint. A candidate is removed only on
  * positive evidence: unknown hours, for instance, are never treated as closed.
  */
+
+/**
+ * True when name/slug/description read as lodging or another non-dining business.
+ * Categories alone are not trusted — junk rows often say Restaurant.
+ */
+function isNonRestaurant(candidate: AskCandidate): boolean {
+  const hay = normalizeText(
+    [candidate.name, candidate.slug || '', candidate.description || ''].join(' | ')
+  )
+  return NON_RESTAURANT_TOKENS.some((token) => containsToken(hay, token))
+}
+
 export function applyHardFilters(
   candidates: AskCandidate[],
   schema: AskSchema,
@@ -347,6 +360,13 @@ export function applyHardFilters(
 
     if (excludeTokens.some((token) => containsToken(identityText(candidate), token))) {
       remove('cuisine_exclude')
+      return false
+    }
+
+    // Miscategorized lodging / rentals / non-dining businesses never answer a
+    // dining ask, even when categories say Restaurant.
+    if (isNonRestaurant(candidate)) {
+      remove('non_restaurant')
       return false
     }
 
