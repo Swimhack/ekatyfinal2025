@@ -1,5 +1,10 @@
 import { runAsk } from '../../lib/ask'
-import { applyHardFilters, rankCandidates } from '../../lib/ask/rank'
+import {
+  applyHardFilters,
+  rankCandidates,
+  scoreCandidate,
+  WEAK_VIBE_WEIGHT,
+} from '../../lib/ask/rank'
 import { parseAskQuery } from '../../lib/ask/parse'
 import type { AskCandidate } from '../../lib/ask/types'
 
@@ -516,11 +521,403 @@ describe('runAsk', () => {
     })
   })
 
+  describe('explicit brand asks', () => {
+    // Mirrors the live shape of the bug: the directory carries the brand, but
+    // it is outrated and outnumbered by local listings that match the same
+    // cuisine words, so soft scoring alone never surfaces it.
+    const BRAND_POOL: AskCandidate[] = [
+      candidate({
+        id: 'bk-fm-1093',
+        slug: 'burger-king',
+        name: 'Burger King',
+        categories: ['Food', 'Restaurant', 'American'],
+        cuisineTypes: ['Burger'],
+        address: '24914 FM 1093',
+        priceLevel: 'BUDGET',
+        rating: 3.4,
+        reviewCount: 900,
+      }),
+      candidate({
+        id: 'bk-mason',
+        slug: 'burger-king-katy-3',
+        name: 'Burger King',
+        categories: ['Food', 'Restaurant', 'American'],
+        cuisineTypes: ['Burger'],
+        address: '603 South Mason Road',
+        priceLevel: 'BUDGET',
+        rating: 3.2,
+        reviewCount: 400,
+      }),
+      candidate({
+        id: 'mcd-fry',
+        slug: 'mcdonald-s-katy',
+        name: "McDonald's",
+        categories: ['Fast Food', 'Restaurant'],
+        cuisineTypes: ['American'],
+        address: '1313 Fry Road',
+        priceLevel: 'BUDGET',
+        rating: 3.5,
+        reviewCount: 1200,
+      }),
+      candidate({
+        id: 'mcd-to-go',
+        slug: 'mcdonald-s-to-go-only',
+        name: "McDonald's (To Go only)",
+        categories: ['Fast Food'],
+        cuisineTypes: ['American'],
+        address: '29914 Jordan Crossing Blvd',
+        priceLevel: 'BUDGET',
+        rating: 3.3,
+        reviewCount: 80,
+      }),
+      candidate({
+        name: 'Build-a-Burger',
+        categories: ['Burgers', 'Casual'],
+        cuisineTypes: ['Burgers', 'American'],
+        rating: 4.8,
+        reviewCount: 620,
+      }),
+      candidate({
+        name: 'Loaded Burger',
+        categories: ['Burgers'],
+        cuisineTypes: ['Burgers', 'Smash Burger'],
+        rating: 4.7,
+        reviewCount: 480,
+      }),
+      candidate({
+        name: "BoomerJack's Grill",
+        categories: ['Burgers', 'Bar'],
+        cuisineTypes: ['Burgers', 'American'],
+        rating: 4.6,
+        reviewCount: 510,
+      }),
+      candidate({
+        name: "Pooja's Patisserie",
+        categories: ['Bakery', 'Food'],
+        cuisineTypes: ['Bakery'],
+        rating: 5,
+        reviewCount: 351,
+      }),
+      candidate({
+        name: 'Citrus Blue Healthy Foods',
+        categories: ['Food', 'Deli', 'Vegetarian'],
+        cuisineTypes: ['Vegetarian', 'Deli'],
+        rating: 5,
+        reviewCount: 346,
+      }),
+    ]
+
+    const BRAND_POOL_IDS = new Set(BRAND_POOL.map((c) => c.id))
+
+    it('leads with the named brand even when local listings outrate it', () => {
+      const result = runAsk('burger king', BRAND_POOL)
+      expect(result.picks[0].name).toBe('Burger King')
+    })
+
+    it('answers a brand ask that names no cuisine at all', () => {
+      const result = runAsk('mcdonalds', BRAND_POOL)
+      expect(result.picks[0].name).toBe("McDonald's")
+    })
+
+    it('returns one location of the named brand, then other listings', () => {
+      const names = runAsk('burger king', BRAND_POOL).picks.map((pick) => pick.name)
+
+      expect(names).toHaveLength(3)
+      expect(names[0]).toBe('Burger King')
+      expect(names.filter((name) => name === 'Burger King')).toHaveLength(1)
+    })
+
+    it('keeps the named brand when the ask also names a cuisine it is not listed under', () => {
+      const { matched } = applyHardFilters(BRAND_POOL, parseAskQuery("mcdonald's for breakfast"))
+      expect(matched.map((c) => c.name)).toContain("McDonald's")
+    })
+
+    it('keeps the named brand ahead of a no-chains filter in the same breath', () => {
+      const { matched } = applyHardFilters(BRAND_POOL, parseAskQuery('burger king but no chains'))
+      expect(matched.map((c) => c.name)).toContain('Burger King')
+    })
+
+    it('never claims a named chain cleared the no-chains filter', () => {
+      const result = runAsk('burger king but no chains', BRAND_POOL)
+      const brandPick = result.picks.find((pick) => pick.name === 'Burger King')
+
+      expect(brandPick).toBeDefined()
+      expect(brandPick?.why).not.toMatch(/no-chains filter/i)
+    })
+
+    it('scores the match as the brand, citing the stored listing name', () => {
+      const { ranked } = rankCandidates(BRAND_POOL, parseAskQuery('burger king'))
+      const [top] = ranked
+
+      expect(top.reasons.map((reason) => reason.kind)).toContain('brand')
+      expect(top.reasons.find((reason) => reason.kind === 'brand')?.detail).toBe('Burger King')
+      expect(top.candidate.name).toBe('Burger King')
+    })
+
+    it('says which listing was asked for by name, with no invented praise', () => {
+      const why = runAsk('burger king', BRAND_POOL).picks[0].why
+
+      expect(why).toContain('Burger King')
+      expect(why).toMatch(/asked for by name/i)
+      expect(why).not.toMatch(/review|popular|everyone|locals love|best in|favorite/i)
+    })
+
+    it('answers with listings we hold when the brand is not in the directory', () => {
+      const result = runAsk('in-n-out', BRAND_POOL)
+
+      expect(result.picks.map((pick) => pick.name)).not.toContain('In-N-Out')
+      for (const pick of result.picks) {
+        expect(BRAND_POOL_IDS.has(pick.id)).toBe(true)
+      }
+    })
+
+    it('still keeps national chains out of a surprise ask over the same pool', () => {
+      const names = runAsk('surprise me', BRAND_POOL).picks.map((pick) => pick.name)
+
+      expect(names).not.toContain('Burger King')
+      expect(names).not.toContain("McDonald's")
+      expect(names).not.toContain("McDonald's (To Go only)")
+      expect(names.length).toBeGreaterThan(0)
+    })
+
+    it('leaves an unrelated ask untouched by brand promotion', () => {
+      const names = runAsk('burgers', BRAND_POOL).picks.map((pick) => pick.name)
+      expect(names[0]).toBe('Build-a-Burger')
+    })
+  })
+
   it('reports how much inventory it considered and matched', () => {
     const result = runAsk('mexican food', POOL)
 
     expect(result.meta.inventory_considered).toBe(POOL.length)
     expect(result.meta.candidates_matched).toBeGreaterThanOrEqual(result.picks.length)
     expect(result.meta.candidates_matched).toBeLessThanOrEqual(POOL.length)
+  })
+})
+
+describe('date night asks', () => {
+  // Mirrors the live shape of the bug: to-go counters and a daytime cafe whose
+  // only date-night evidence is a bare "wine" tag, sitting alongside the
+  // sit-down rooms a date night is actually for.
+  const DATE_NIGHT_POOL: AskCandidate[] = [
+    candidate({
+      name: 'Eskimo Hut',
+      categories: ['Bar', 'Liquor Store'],
+      cuisineTypes: ['Frozen Drinks'],
+      tags: ['wine', 'beer'],
+      rating: 4.7,
+      reviewCount: 300,
+    }),
+    candidate({
+      name: 'Bayou Daiquiris To Go',
+      categories: ['Bar'],
+      cuisineTypes: ['Daiquiris'],
+      tags: ['wine'],
+      rating: 4.8,
+    }),
+    candidate({
+      name: 'Sno Shack Katy',
+      categories: ['Snow Cone Stand', 'Dessert'],
+      cuisineTypes: ['Raspados'],
+      tags: ['wine'],
+      rating: 4.9,
+    }),
+    candidate({
+      name: 'Highway Blvd Drive-In',
+      categories: ['American', 'Drive-In'],
+      cuisineTypes: ['Burgers'],
+      tags: ['wine', 'cocktail'],
+      rating: 4.6,
+    }),
+    candidate({
+      name: 'Cinco Taco Truck',
+      categories: ['Food Truck', 'Mexican'],
+      cuisineTypes: ['Tacos'],
+      tags: ['wine'],
+      rating: 4.9,
+    }),
+    candidate({
+      name: 'Antonia Cucina Italiana',
+      categories: ['Italian'],
+      cuisineTypes: ['italian', 'pasta'],
+      tags: ['date-night', 'wine'],
+      features: ['Wine Bar'],
+      priceLevel: 'UPSCALE',
+      rating: 4.6,
+    }),
+    candidate({
+      name: "Perry's Steakhouse & Grille",
+      categories: ['Steakhouse', 'Fine Dining'],
+      cuisineTypes: ['steakhouse'],
+      features: ['Private Dining'],
+      priceLevel: 'PREMIUM',
+      rating: 4.8,
+    }),
+    candidate({
+      name: 'Vine & Olive Ristorante',
+      categories: ['Italian'],
+      cuisineTypes: ['italian'],
+      tags: ['wine'],
+      priceLevel: 'UPSCALE',
+      rating: 4.4,
+    }),
+    candidate({
+      name: 'Cafe Benedicte',
+      categories: ['Cafe', 'Bakery'],
+      cuisineTypes: ['Breakfast', 'Sandwiches'],
+      tags: ['wine'],
+      rating: 4.9,
+      reviewCount: 800,
+    }),
+  ]
+
+  const DATE_NIGHT_QUERIES = [
+    'date night',
+    'romantic dinner',
+    'anniversary dinner for two',
+    'date night for the two of us',
+    'date night with a good wine list',
+    'romantic spot in 77494',
+  ]
+
+  /** Everything a pick says it is, which is what the format screen reads. */
+  function identity(pick: { name: string; categories: string[]; cuisineTypes: string[] }): string {
+    return [pick.name, ...pick.categories, ...pick.cuisineTypes].join(' | ')
+  }
+
+  it.each(DATE_NIGHT_QUERIES)('never answers %j with a to-go format', (query) => {
+    const picks = runAsk(query, DATE_NIGHT_POOL).picks
+
+    expect(picks.length).toBeGreaterThan(0)
+    for (const pick of picks) {
+      expect(identity(pick)).not.toMatch(/to-go|to go|daiquiri|drive-in|drive thru/i)
+      expect(identity(pick)).not.toMatch(/snow cone|raspado|food truck/i)
+    }
+  })
+
+  it.each(DATE_NIGHT_QUERIES)('never answers %j with Eskimo Hut', (query) => {
+    const names = runAsk(query, DATE_NIGHT_POOL).picks.map((pick) => pick.name)
+    expect(names).not.toContain('Eskimo Hut')
+  })
+
+  it('drops the to-go formats in the hard filter, not by out-scoring them', () => {
+    const { matched, removedBy } = applyHardFilters(DATE_NIGHT_POOL, parseAskQuery('date night'))
+    const names = matched.map((c) => c.name)
+
+    expect(names).toEqual([
+      'Antonia Cucina Italiana',
+      "Perry's Steakhouse & Grille",
+      'Vine & Olive Ristorante',
+      'Cafe Benedicte',
+    ])
+    expect(removedBy.date_night_format).toBe(5)
+  })
+
+  it('keeps a to-go format out even when its rating would have carried it', () => {
+    const thin = [
+      candidate({ name: 'Eskimo Hut', tags: ['wine'], rating: 5, reviewCount: 900 }),
+      candidate({ name: 'Bayou Daiquiris To Go', cuisineTypes: ['Daiquiris'], tags: ['wine'], rating: 5 }),
+      candidate({
+        name: 'Antonia Cucina Italiana',
+        categories: ['Italian'],
+        tags: ['date-night'],
+        priceLevel: 'UPSCALE',
+        rating: 3.9,
+      }),
+    ]
+    const result = runAsk('date night', thin)
+
+    expect(result.picks.map((pick) => pick.name)).toEqual(['Antonia Cucina Italiana'])
+    expect(result.shortfall?.returned).toBe(1)
+    expect(result.shortfall?.limiting_filters).toContain('a table to sit at for date night')
+  })
+
+  it('leaves every other ask free to answer with a to-go format', () => {
+    const { matched, removedBy } = applyHardFilters(DATE_NIGHT_POOL, parseAskQuery('daiquiris to go'))
+
+    expect(matched.map((c) => c.name)).toContain('Bayou Daiquiris To Go')
+    expect(removedBy.date_night_format).toBeUndefined()
+
+    const truckNames = runAsk('tacos', DATE_NIGHT_POOL).picks.map((pick) => pick.name)
+    expect(truckNames).toContain('Cinco Taco Truck')
+  })
+
+  it('stands the screen down for the format the diner named', () => {
+    const { matched } = applyHardFilters(
+      DATE_NIGHT_POOL,
+      parseAskQuery('date night at a food truck')
+    )
+    const names = matched.map((c) => c.name)
+
+    expect(names).toContain('Cinco Taco Truck')
+    expect(names).not.toContain('Bayou Daiquiris To Go')
+  })
+
+  it('gives a bare "wine" tag no vibe points without a sit-down signal', () => {
+    const counter = candidate({
+      name: 'Wine Window',
+      categories: ['Bar'],
+      cuisineTypes: ['Drinks'],
+      tags: ['wine', 'cocktail'],
+    })
+    const { reasons } = scoreCandidate(counter, parseAskQuery('date night'))
+
+    expect(reasons.map((reason) => reason.kind)).not.toContain('vibe')
+    expect(reasons.map((reason) => reason.kind)).not.toContain('sit_down')
+  })
+
+  it('counts a "wine" tag faintly for a listing that reads as a sit-down room', () => {
+    const room = candidate({
+      name: 'Vine & Olive Ristorante',
+      categories: ['Italian'],
+      cuisineTypes: ['italian'],
+      tags: ['wine'],
+      priceLevel: 'UPSCALE',
+    })
+    const { reasons } = scoreCandidate(room, parseAskQuery('date night'))
+    const vibe = reasons.find((reason) => reason.kind === 'vibe')
+
+    expect(vibe?.evidence).toBe('wine')
+    expect(vibe?.weight).toBe(WEAK_VIBE_WEIGHT)
+    expect(reasons.map((reason) => reason.kind)).toContain('sit_down')
+  })
+
+  it('leads with a listing tagged for the occasion over one that just pours wine', () => {
+    const { ranked } = rankCandidates(DATE_NIGHT_POOL, parseAskQuery('date night'))
+
+    expect(ranked[0].candidate.name).toBe('Antonia Cucina Italiana')
+    expect(ranked.map((entry) => entry.candidate.name)).not.toContain('Cafe Benedicte')
+  })
+
+  it('ranks every date-night pick on a sit-down signal or a stored tag', () => {
+    for (const entry of rankCandidates(DATE_NIGHT_POOL, parseAskQuery('date night')).ranked) {
+      const kinds = entry.reasons.map((reason) => reason.kind)
+      expect(kinds.includes('sit_down') || kinds.includes('vibe')).toBe(true)
+    }
+  })
+
+  it("keeps Perry's for a date night and drops it only when chains are ruled out", () => {
+    const names = runAsk('date night', DATE_NIGHT_POOL).picks.map((pick) => pick.name)
+    expect(names).toContain("Perry's Steakhouse & Grille")
+
+    const noChains = runAsk('date night, no chains', DATE_NIGHT_POOL).picks.map((pick) => pick.name)
+    expect(noChains).not.toContain("Perry's Steakhouse & Grille")
+  })
+
+  it('cites the stored word behind a sit-down read rather than a room we assumed', () => {
+    const why = runAsk('date night', DATE_NIGHT_POOL).picks.map((pick) => pick.why).join(' | ')
+
+    expect(why).toMatch(/read from its listed "(fine dining|italian|steakhouse)"/)
+    expect(why).not.toMatch(/candlelit|white tablecloth|intimate|perfect for/i)
+    expect(why).not.toMatch(/review|popular|everyone|locals love|best in|favorite/i)
+  })
+
+  it('only ever answers with listings from the pool it was given', () => {
+    const ids = new Set(DATE_NIGHT_POOL.map((c) => c.id))
+    for (const query of DATE_NIGHT_QUERIES) {
+      for (const pick of runAsk(query, DATE_NIGHT_POOL).picks) {
+        expect(ids.has(pick.id)).toBe(true)
+      }
+    }
   })
 })

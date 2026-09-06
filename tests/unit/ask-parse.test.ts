@@ -193,6 +193,23 @@ describe('parseAskQuery', () => {
       expect(parseAskQuery('anywhere with a patio').vibe).toContain('patio')
     })
 
+    it.each([
+      ['date night at a food truck', 'food truck'],
+      ['daiquiris to go', 'daiquiri'],
+      ['somewhere with a drive thru', 'drive-thru'],
+      ['raspados for the kids', 'snow cone'],
+    ])('reads %j as asking for the %j format', (query, expected) => {
+      expect(parseAskQuery(query).formats).toContain(expected)
+    })
+
+    it('leaves formats empty when the request names none', () => {
+      expect(parseAskQuery('date night for the two of us').formats).toEqual([])
+    })
+
+    it('does not read a ruled-out format as a request for it', () => {
+      expect(parseAskQuery('date night, no food trucks').formats).toEqual([])
+    })
+
     it.each(["what's open now", 'anything open late', 'is anywhere still open'])(
       'flags %j as open now',
       (query) => {
@@ -223,6 +240,7 @@ describe('parseAskQuery', () => {
         cuisine_exclude: [],
         exclude_chains: false,
         brands: [],
+        formats: [],
         vibe: [],
         novelty: 'mixed',
       })

@@ -7,7 +7,7 @@
 
 import { brandTextForms } from './chains'
 import type { AskSchema, Budget, BudgetTier, PriceLevel } from './types'
-import { AREAS, AREA_ALIASES, CUISINES, KNOWN_CHAIN_BRANDS, VIBES } from './vocabulary'
+import { AREAS, AREA_ALIASES, CUISINES, KNOWN_CHAIN_BRANDS, SERVICE_FORMATS, VIBES } from './vocabulary'
 
 const NUMBER_WORDS: Record<string, number> = {
   one: 1,
@@ -459,6 +459,21 @@ function parseBrands(text: string): string[] {
   return uniqueInOrder(found)
 }
 
+/**
+ * Service formats the diner asked for, e.g. "date night at a food truck".
+ *
+ * Only an outright request counts. These are the same formats a date-night ask
+ * screens out, so naming one is the diner telling us to stand that screen
+ * down — while "no food trucks" is the opposite and leaves it up.
+ */
+function parseFormats(text: string, mask: boolean[]): string[] {
+  const hits = matchVocabulary(
+    text,
+    SERVICE_FORMATS.map((format) => ({ value: format.label, phrases: format.synonyms }))
+  )
+  return uniqueInOrder(hits.filter(({ hit }) => !isNegated(mask, hit)).map(({ value }) => value))
+}
+
 function parseNovelty(text: string): AskSchema['novelty'] {
   if (firstPresentPhrase(text, SURPRISE_PHRASES)) return 'surprise'
   if (firstPresentPhrase(text, FAMILIAR_PHRASES)) return 'familiar'
@@ -500,6 +515,7 @@ export function parseAskQuery(raw: string): AskSchema {
     cuisine_exclude: excludedCuisines,
     exclude_chains: parseExcludeChains(text, mask),
     brands: parseBrands(text),
+    formats: parseFormats(text, mask),
     vibe: kids === true && !vibe.includes('family friendly') ? [...vibe, 'family friendly'] : vibe,
     novelty: parseNovelty(text),
   }

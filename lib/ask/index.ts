@@ -23,12 +23,19 @@ export { parseAskQuery, budgetCeiling, budgetMaxPriceLevel, budgetTier, normaliz
 export {
   rankCandidates,
   applyHardFilters,
+  brandMatchIds,
+  dateNightFormatBlock,
   scoreCandidate,
+  sitDownSignal,
   suppressesChainsForSurprise,
+  wantsDateNight,
   zipCentroid,
   DEFAULT_PICK_COUNT,
+  EXPLICIT_BRAND_WEIGHT,
+  SIT_DOWN_WEIGHT,
+  WEAK_VIBE_WEIGHT,
 } from './rank'
-export { buildChainIndex, findBrandMentions, isChain } from './chains'
+export { buildChainIndex, findBrandMentions, isChain, nameCarriesBrand } from './chains'
 export { isOpenAt, katyLocalNow } from './hours'
 export { buildWhyLine } from './why'
 
@@ -40,6 +47,7 @@ const FILTER_LABELS: Record<string, string> = {
   cuisine_exclude: 'the cuisines you ruled out',
   exclude_chains: 'no chains',
   surprise_chains: 'skipping the multi-location brands for a surprise',
+  date_night_format: 'a table to sit at for date night',
   budget_ceiling: 'your price ceiling',
   open_now: 'open right now',
 }

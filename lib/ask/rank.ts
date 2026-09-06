@@ -8,7 +8,7 @@
 //   2. Soft scoring for fit (budget tier, proximity, vibe, kids, party size,
 //      novelty), which only reorders what already passed.
 
-import { buildChainIndex, type ChainIndex } from './chains'
+import { buildChainIndex, nameCarriesBrand, type ChainIndex } from './chains'
 import { isOpenAt, type OpenState } from './hours'
 import { budgetCeiling, budgetMaxPriceLevel, budgetTargetPriceLevel, budgetTier } from './parse'
 import {
@@ -19,7 +19,14 @@ import {
   type MatchReason,
   type PriceLevel,
 } from './types'
-import { AREA_ALIASES, CUISINES, VIBES } from './vocabulary'
+import {
+  AREA_ALIASES,
+  CUISINES,
+  NON_SIT_DOWN_BRANDS,
+  SERVICE_FORMATS,
+  SIT_DOWN_TOKENS,
+  VIBES,
+} from './vocabulary'
 
 export const DEFAULT_PICK_COUNT = 3
 
@@ -39,6 +46,49 @@ const KID_TOKENS = ['family', 'kid', 'kids', 'high chair', 'playground']
  */
 export function suppressesChainsForSurprise(schema: AskSchema): boolean {
   return schema.novelty === 'surprise' && schema.brands.length === 0
+}
+
+/**
+ * Weight carried by a listing the diner named outright.
+ *
+ * Sized above any single soft signal so the named brand's why-line leads with
+ * the name, but the ordering guarantee comes from the sort in
+ * `rankCandidates` rather than from this number winning an arithmetic race.
+ */
+export const EXPLICIT_BRAND_WEIGHT = 6
+
+/**
+ * Weight for a listing whose own categories read as a sit-down dining room on
+ * a date-night ask.
+ *
+ * Sized above the price-tier hint and below a listing tagged for date night
+ * outright, so what a place is ranks ahead of what it costs and behind a
+ * stored tag that names the occasion.
+ */
+export const SIT_DOWN_WEIGHT = 1.25
+
+/** Weight for a token that goes with a vibe without establishing it. */
+export const WEAK_VIBE_WEIGHT = 0.5
+
+/**
+ * The listings that carry a brand the diner named, e.g. every Burger King row
+ * for "burger king".
+ *
+ * A named brand is the most specific thing a diner can say, so these ids are
+ * what the rest of the pipeline treats as explicit intent: they are exempt
+ * from the cuisine and chain filters that infer intent from looser wording,
+ * and they sort ahead of everything else.
+ */
+export function brandMatchIds(candidates: AskCandidate[], schema: AskSchema): Set<string> {
+  const ids = new Set<string>()
+  if (schema.brands.length === 0) return ids
+
+  for (const candidate of candidates) {
+    if (schema.brands.some((brand) => nameCarriesBrand(candidate.name, brand))) {
+      ids.add(candidate.id)
+    }
+  }
+  return ids
 }
 
 export interface RankOptions {
@@ -106,6 +156,87 @@ function containsToken(haystack: string, token: string): boolean {
   return haystack.includes(token.toLowerCase())
 }
 
+const FORMAT_TOKEN_PATTERNS = new Map<string, RegExp>()
+
+/**
+ * Whole-token containment, used where a loose substring would wrongly drop a
+ * listing: "to go" has to hit "Daiquiris To Go" without hitting "Pinto Gordo".
+ *
+ * Spaces and hyphens are interchangeable because stored categories use both
+ * ("drive-in", "drive in"), and a trailing plural still counts so "Daiquiris"
+ * answers to "daiquiri".
+ */
+function containsFormatToken(haystack: string, token: string): boolean {
+  let pattern = FORMAT_TOKEN_PATTERNS.get(token)
+  if (!pattern) {
+    const body = token
+      .toLowerCase()
+      .split(/[\s-]+/)
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('[\\s-]+')
+    pattern = new RegExp(`(?:^|[^a-z0-9])${body}(?:e?s)?(?![a-z0-9])`)
+    FORMAT_TOKEN_PATTERNS.set(token, pattern)
+  }
+  return pattern.test(haystack)
+}
+
+/**
+ * Whether the request is for a dinner out with a partner.
+ *
+ * "romantic", "anniversary" and "just us two" all parse to the same `date
+ * night` label, so this one check covers every wording the parser recognises.
+ * A bare party of two does not: two friends at a table for two are not on a
+ * date, and nothing here guesses that they are.
+ */
+export function wantsDateNight(schema: AskSchema): boolean {
+  return schema.vibe.includes('date night')
+}
+
+/**
+ * The stored word that reads as a sit-down dining room, or null.
+ *
+ * Read off identity fields only. A "wine" tag says what a place pours, which
+ * a drive-up window can also do; "Steakhouse" in its categories is what the
+ * place is.
+ */
+export function sitDownSignal(candidate: AskCandidate): string | null {
+  const identity = identityText(candidate)
+  return SIT_DOWN_TOKENS.find((token) => containsToken(identity, token)) || null
+}
+
+/**
+ * The stored evidence that a listing cannot host a date night, or null.
+ *
+ * Two things disqualify a listing, and both are about format rather than
+ * quality: its own name or categories say it is a to-go counter, a window or a
+ * truck, or it is one of the brands that is nothing but a window
+ * (NON_SIT_DOWN_BRANDS). A diner who asks for a format outright keeps it, and
+ * a diner who names a brand outright keeps that too — the same exemption the
+ * cuisine and chain filters already make — but a brand with no dining room
+ * anywhere is never the answer to "date night".
+ */
+export function dateNightFormatBlock(
+  candidate: AskCandidate,
+  schema: AskSchema,
+  options: { namedBrand?: boolean } = {}
+): string | null {
+  if (!wantsDateNight(schema)) return null
+
+  const windowBrand = NON_SIT_DOWN_BRANDS.find((brand) => nameCarriesBrand(candidate.name, brand))
+  if (windowBrand) return windowBrand
+
+  if (options.namedBrand) return null
+
+  const identity = identityText(candidate)
+  for (const format of SERVICE_FORMATS) {
+    if (schema.formats.includes(format.label)) continue
+    const matched = format.tokens.find((token) => containsFormatToken(identity, token))
+    if (matched) return matched
+  }
+
+  return null
+}
+
 function priceIndex(level: PriceLevel): number {
   const index = PRICE_LEVEL_ORDER.indexOf(level)
   return index === -1 ? 1 : index
@@ -166,6 +297,8 @@ export interface HardFilterResult {
   removedBy: Record<string, number>
   chainIndex: ChainIndex
   openStates: Map<string, OpenState>
+  /** Candidate ids carrying a brand the diner named. */
+  brandMatches: Set<string>
 }
 
 /**
@@ -180,6 +313,7 @@ export function applyHardFilters(
 ): HardFilterResult {
   const now = options.now || new Date()
   const chainIndex = buildChainIndex(candidates, explicitChainFlags)
+  const brandMatches = brandMatchIds(candidates, schema)
   const openStates = new Map<string, OpenState>()
 
   const removedBy: Record<string, number> = {}
@@ -195,7 +329,12 @@ export function applyHardFilters(
   // rejected it, with the usually-narrowest constraint checked first. That
   // keeps the shortfall message pointed at the filter worth loosening.
   const matched = candidates.filter((candidate) => {
-    if (includeTokenGroups.length > 0) {
+    // The diner named this listing. Cuisine wording and the chain filter are
+    // both inferences about what they meant, and neither gets to overrule the
+    // name they typed. Price, hours and ruled-out cuisines still apply.
+    const namedBrand = brandMatches.has(candidate.id)
+
+    if (includeTokenGroups.length > 0 && !namedBrand) {
       const fit = fitText(candidate)
       const matchesAny = includeTokenGroups.some((tokens) =>
         tokens.some((token) => containsToken(fit, token))
@@ -211,7 +350,16 @@ export function applyHardFilters(
       return false
     }
 
-    if (schema.exclude_chains && chainIndex.ids.has(candidate.id)) {
+    // A date night is a table for two, so the formats that have no table are
+    // out regardless of what else they score. This is the filter that keeps a
+    // drive-up daiquiri window from answering "date night" on the strength of
+    // a "wine" tag.
+    if (dateNightFormatBlock(candidate, schema, { namedBrand }) !== null) {
+      remove('date_night_format')
+      return false
+    }
+
+    if (schema.exclude_chains && !namedBrand && chainIndex.ids.has(candidate.id)) {
       remove('exclude_chains')
       return false
     }
@@ -241,10 +389,10 @@ export function applyHardFilters(
     const independents = matched.filter((candidate) => !chainIndex.ids.has(candidate.id))
     const dropped = matched.length - independents.length
     if (dropped > 0) removedBy.surprise_chains = dropped
-    return { matched: independents, removedBy, chainIndex, openStates }
+    return { matched: independents, removedBy, chainIndex, openStates, brandMatches }
   }
 
-  return { matched, removedBy, chainIndex, openStates }
+  return { matched, removedBy, chainIndex, openStates, brandMatches }
 }
 
 /**
@@ -260,6 +408,8 @@ export function scoreCandidate(
     chainIndex?: ChainIndex
     openState?: OpenState
     seed?: string
+    /** This listing carries a brand named in the request. */
+    namedBrand?: boolean
   } = {}
 ): { score: number; reasons: MatchReason[] } {
   const reasons: MatchReason[] = []
@@ -267,6 +417,13 @@ export function scoreCandidate(
   const address = normalizeText(candidate.address)
   const addReason = (reason: MatchReason) => {
     if (reason.weight !== 0) reasons.push(reason)
+  }
+
+  // The brand the diner asked for by name. Cited as the listing's own stored
+  // name, so the why-line restates what we hold rather than the spelling the
+  // diner happened to type.
+  if (context.namedBrand) {
+    addReason({ kind: 'brand', detail: candidate.name, weight: EXPLICIT_BRAND_WEIGHT })
   }
 
   // Requested cuisine. Already guaranteed by the hard filter; scored so the
@@ -335,6 +492,18 @@ export function scoreCandidate(
     }
   }
 
+  // What the listing is, on an ask that turns on having a room to sit in.
+  // Cited as our reading of the stored word, since the word is what we hold.
+  const sitDown = sitDownSignal(candidate)
+  if (wantsDateNight(schema) && sitDown) {
+    addReason({
+      kind: 'sit_down',
+      detail: 'sit-down dinner',
+      evidence: sitDown,
+      weight: SIT_DOWN_WEIGHT,
+    })
+  }
+
   // Vibe, matched against tags, features, categories and description.
   let vibeWeight = 0
   let pricedForVibe = false
@@ -347,6 +516,20 @@ export function scoreCandidate(
       const weight = Math.min(2, 4 - vibeWeight)
       if (weight > 0) {
         addReason({ kind: 'vibe', detail: label, evidence: matchedToken, weight })
+        vibeWeight += weight
+      }
+      continue
+    }
+
+    // A token that goes with the vibe without establishing it — a wine list on
+    // a date-night ask. It corroborates a listing that already reads as a
+    // sit-down room and counts for nothing on its own, so a bare "wine" tag
+    // can no longer carry a listing into the picks by itself.
+    const weakToken = def.weakTokens?.find((token) => containsToken(fit, token))
+    if (weakToken && sitDown) {
+      const weight = Math.min(WEAK_VIBE_WEIGHT, 4 - vibeWeight)
+      if (weight > 0) {
+        addReason({ kind: 'vibe', detail: label, evidence: weakToken, weight })
         vibeWeight += weight
       }
       continue
@@ -386,7 +569,9 @@ export function scoreCandidate(
     addReason({ kind: 'open_now', detail: 'open now per listed hours', weight: 1 })
   }
 
-  if (schema.exclude_chains) {
+  // A listing kept because the diner named it has not cleared the no-chains
+  // filter — it was exempted from it — so it never claims to have.
+  if (schema.exclude_chains && !context.namedBrand) {
     addReason({ kind: 'no_chains', detail: 'clears your no-chains filter', weight: 0.75 })
   }
 
@@ -452,7 +637,7 @@ export function rankCandidates(
   explicitChainFlags?: Map<string, boolean>
 ): RankResult {
   const limit = options.limit ?? DEFAULT_PICK_COUNT
-  const { matched, removedBy, chainIndex, openStates } = applyHardFilters(
+  const { matched, removedBy, chainIndex, openStates, brandMatches } = applyHardFilters(
     candidates,
     schema,
     options,
@@ -472,10 +657,18 @@ export function rankCandidates(
         chainIndex,
         openState,
         seed: options.seed,
+        namedBrand: brandMatches.has(candidate.id),
       })
       return { candidate, score, reasons, openState }
     })
     .sort((a, b) => {
+      // A brand the diner named leads, whatever else scored. Soft signals
+      // decide the order among the brand's own locations and among everything
+      // else, but they never push the named brand out of the picks.
+      const brandDiff =
+        Number(brandMatches.has(b.candidate.id)) - Number(brandMatches.has(a.candidate.id))
+      if (brandDiff !== 0) return brandDiff
+
       if (b.score !== a.score) return b.score - a.score
       const ratingDiff = (b.candidate.rating || 0) - (a.candidate.rating || 0)
       if (ratingDiff !== 0) return ratingDiff

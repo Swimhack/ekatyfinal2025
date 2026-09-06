@@ -27,10 +27,20 @@ export interface AskSchema {
   /**
    * Known multi-location brands the diner named, e.g. "burger king".
    *
-   * A named brand is an explicit request, so it switches off the chain
-   * suppression that a `surprise` ask would otherwise apply.
+   * A named brand is an explicit request. Listings carrying it lead the picks,
+   * are exempt from the cuisine and chain filters that infer intent from
+   * looser wording, and switch off the chain suppression a `surprise` ask
+   * would otherwise apply.
    */
   brands: string[]
+  /**
+   * Service formats the diner asked for outright, e.g. "to-go", "food truck".
+   *
+   * A date-night ask screens these formats out, because none of them has a
+   * table to sit at. Naming one is the diner overriding that screen for
+   * themselves; it never adds a format to a request that did not mention one.
+   */
+  formats: string[]
   /** Named Katy area matched against listing addresses, e.g. "Cinco Ranch". */
   area?: string
   /** 5-digit ZIP mentioned in the request. */
@@ -74,6 +84,7 @@ export interface AskCandidate {
 }
 
 export type MatchReasonKind =
+  | 'brand'
   | 'cuisine'
   | 'budget'
   | 'budget_cap'
@@ -82,6 +93,7 @@ export type MatchReasonKind =
   | 'area'
   | 'vibe'
   | 'vibe_price'
+  | 'sit_down'
   | 'kids'
   | 'party_size'
   | 'open_now'
