@@ -133,6 +133,16 @@ describe('isUsableOgImage', () => {
   it('rejects formats a scraper will not render', () => {
     expect(isUsableOgImage('https://cdn.example.com/storefront.svg')).toBe(false)
   })
+
+  it('rejects an image that declares itself smaller than Open Graph allows', () => {
+    expect(isUsableOgImage('https://dynl.mktgcdn.com/p/abc/150x150.png')).toBe(false)
+    expect(isUsableOgImage('https://cdn.example.com/photo.jpg?width=64&height=64')).toBe(false)
+  })
+
+  it('keeps a large image whose path or query states its size', () => {
+    expect(isUsableOgImage('https://a.mktgcdn.com/p/abc/2389x2389.jpg')).toBe(true)
+    expect(isUsableOgImage('https://dyn.mktgcdn.com/p/abc/width=250,height=505')).toBe(true)
+  })
 })
 
 describe('pickOgImage', () => {

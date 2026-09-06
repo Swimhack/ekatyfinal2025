@@ -109,6 +109,30 @@ const BRAND_MARKETING_PATH_HINTS = [
 /** Formats a scraper will not render as a share card. */
 const UNSUPPORTED_IMAGE_EXTENSIONS = ['.svg', '.svgz', '.ico', '.tif', '.tiff', '.avif', '.pdf']
 
+/** Open Graph's documented minimum edge. A scraper drops anything smaller. */
+const MIN_OG_IMAGE_EDGE = 200
+
+/**
+ * True when the URL declares a size below Open Graph's minimum, in either of
+ * the two ways the CDNs in this data set spell it: a `/150x150.png` segment or
+ * `width=`/`h=` parameters. Whataburger's listing carried a 150x150 square,
+ * which is a logo and which every scraper would have thrown away anyway.
+ */
+function declaresTooSmall(pathAndQuery: string): boolean {
+  const square = pathAndQuery.match(/(?:^|[/\-_])(\d{2,4})x(\d{2,4})(?=[./\-_]|$)/)
+  if (square && (Number(square[1]) < MIN_OG_IMAGE_EDGE || Number(square[2]) < MIN_OG_IMAGE_EDGE)) {
+    return true
+  }
+
+  const dimension = /(?:^|[?&,/])(?:width|height|w|h)=(\d{1,4})(?=[&,/]|$)/g
+  let match: RegExpExecArray | null
+  while ((match = dimension.exec(pathAndQuery)) !== null) {
+    if (Number(match[1]) < MIN_OG_IMAGE_EDGE) return true
+  }
+
+  return false
+}
+
 export function siteUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || 'https://ekaty.com').replace(/\/+$/, '')
 }
@@ -207,6 +231,7 @@ export function isUsableOgImage(url: string): boolean {
   if (UNSUPPORTED_IMAGE_EXTENSIONS.some((ext) => pathAndQuery.split('?')[0].endsWith(ext))) return false
   if (LOGO_PATH_HINTS.some((hint) => pathAndQuery.includes(hint))) return false
   if (BRAND_MARKETING_PATH_HINTS.some((hint) => pathAndQuery.includes(hint))) return false
+  if (declaresTooSmall(pathAndQuery)) return false
 
   return true
 }
