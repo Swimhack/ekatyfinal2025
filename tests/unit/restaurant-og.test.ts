@@ -139,9 +139,18 @@ describe('isUsableOgImage', () => {
     expect(isUsableOgImage('https://cdn.example.com/photo.jpg?width=64&height=64')).toBe(false)
   })
 
+  it("rejects a Wix header strip, whose transform states it is 44px tall", () => {
+    const strip =
+      'https://static.wixstatic.com/media/086fc8_abc~mv2.png/v1/fill/w_414,h_44,al_c,q_85/PHOTOGRAPHY.png'
+    expect(isUsableOgImage(strip)).toBe(false)
+  })
+
   it('keeps a large image whose path or query states its size', () => {
     expect(isUsableOgImage('https://a.mktgcdn.com/p/abc/2389x2389.jpg')).toBe(true)
     expect(isUsableOgImage('https://dyn.mktgcdn.com/p/abc/width=250,height=505')).toBe(true)
+    expect(
+      isUsableOgImage('https://res.cloudinary.com/x/image/upload/c_fill,h_630,w_1200/hero.jpg')
+    ).toBe(true)
   })
 })
 

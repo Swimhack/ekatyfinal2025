@@ -113,10 +113,11 @@ const UNSUPPORTED_IMAGE_EXTENSIONS = ['.svg', '.svgz', '.ico', '.tif', '.tiff', 
 const MIN_OG_IMAGE_EDGE = 200
 
 /**
- * True when the URL declares a size below Open Graph's minimum, in either of
- * the two ways the CDNs in this data set spell it: a `/150x150.png` segment or
- * `width=`/`h=` parameters. Whataburger's listing carried a 150x150 square,
- * which is a logo and which every scraper would have thrown away anyway.
+ * True when the URL declares a size below Open Graph's minimum, in any of the
+ * three ways the CDNs in this data set spell it: a `/150x150.png` segment,
+ * `width=`/`h=` parameters, and the `w_414,h_44` transform Wix and Cloudinary
+ * use. Whataburger's listing carried a 150x150 logo and a Wix listing carried a
+ * 414x44 header strip; every scraper would have thrown both away anyway.
  */
 function declaresTooSmall(pathAndQuery: string): boolean {
   const square = pathAndQuery.match(/(?:^|[/\-_])(\d{2,4})x(\d{2,4})(?=[./\-_]|$)/)
@@ -124,7 +125,7 @@ function declaresTooSmall(pathAndQuery: string): boolean {
     return true
   }
 
-  const dimension = /(?:^|[?&,/])(?:width|height|w|h)=(\d{1,4})(?=[&,/]|$)/g
+  const dimension = /(?:^|[?&,/])(?:width|height|w|h)[_=](\d{1,4})(?=[&,/]|$)/g
   let match: RegExpExecArray | null
   while ((match = dimension.exec(pathAndQuery)) !== null) {
     if (Number(match[1]) < MIN_OG_IMAGE_EDGE) return true
