@@ -13,6 +13,19 @@ export const metadata: Metadata = {
       'Tell Ask eKaty what you are in the mood for and get three real Katy restaurant picks.',
     url: '/ask',
     type: 'website',
+    images: [{ url: '/ask/og', width: 1200, height: 630, alt: 'Ask eKaty' }],
+  },
+  // Spelled out rather than left to inherit. A child that declares openGraph
+  // does not inherit the parent's images, so a share had no picture at all,
+  // and an unset twitter block falls through to the root layout wholesale —
+  // which titled every Ask share "Best Restaurants in Katy TX | eKaty" and
+  // illustrated it with the homepage card.
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Ask eKaty — Where should we eat in Katy?',
+    description:
+      'Tell Ask eKaty what you are in the mood for and get three real Katy restaurant picks.',
+    images: ['/ask/og'],
   },
 }
 
