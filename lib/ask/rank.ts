@@ -19,7 +19,14 @@ import {
   type MatchReason,
   type PriceLevel,
 } from './types'
-import { AREA_ALIASES, CUISINES, VIBES } from './vocabulary'
+import {
+  AREA_ALIASES,
+  CUISINES,
+  NON_SIT_DOWN_BRANDS,
+  SERVICE_FORMATS,
+  SIT_DOWN_TOKENS,
+  VIBES,
+} from './vocabulary'
 
 export const DEFAULT_PICK_COUNT = 3
 
@@ -49,6 +56,19 @@ export function suppressesChainsForSurprise(schema: AskSchema): boolean {
  * `rankCandidates` rather than from this number winning an arithmetic race.
  */
 export const EXPLICIT_BRAND_WEIGHT = 6
+
+/**
+ * Weight for a listing whose own categories read as a sit-down dining room on
+ * a date-night ask.
+ *
+ * Sized above the price-tier hint and below a listing tagged for date night
+ * outright, so what a place is ranks ahead of what it costs and behind a
+ * stored tag that names the occasion.
+ */
+export const SIT_DOWN_WEIGHT = 1.25
+
+/** Weight for a token that goes with a vibe without establishing it. */
+export const WEAK_VIBE_WEIGHT = 0.5
 
 /**
  * The listings that carry a brand the diner named, e.g. every Burger King row
@@ -134,6 +154,87 @@ function fitText(candidate: AskCandidate): string {
 
 function containsToken(haystack: string, token: string): boolean {
   return haystack.includes(token.toLowerCase())
+}
+
+const FORMAT_TOKEN_PATTERNS = new Map<string, RegExp>()
+
+/**
+ * Whole-token containment, used where a loose substring would wrongly drop a
+ * listing: "to go" has to hit "Daiquiris To Go" without hitting "Pinto Gordo".
+ *
+ * Spaces and hyphens are interchangeable because stored categories use both
+ * ("drive-in", "drive in"), and a trailing plural still counts so "Daiquiris"
+ * answers to "daiquiri".
+ */
+function containsFormatToken(haystack: string, token: string): boolean {
+  let pattern = FORMAT_TOKEN_PATTERNS.get(token)
+  if (!pattern) {
+    const body = token
+      .toLowerCase()
+      .split(/[\s-]+/)
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('[\\s-]+')
+    pattern = new RegExp(`(?:^|[^a-z0-9])${body}(?:e?s)?(?![a-z0-9])`)
+    FORMAT_TOKEN_PATTERNS.set(token, pattern)
+  }
+  return pattern.test(haystack)
+}
+
+/**
+ * Whether the request is for a dinner out with a partner.
+ *
+ * "romantic", "anniversary" and "just us two" all parse to the same `date
+ * night` label, so this one check covers every wording the parser recognises.
+ * A bare party of two does not: two friends at a table for two are not on a
+ * date, and nothing here guesses that they are.
+ */
+export function wantsDateNight(schema: AskSchema): boolean {
+  return schema.vibe.includes('date night')
+}
+
+/**
+ * The stored word that reads as a sit-down dining room, or null.
+ *
+ * Read off identity fields only. A "wine" tag says what a place pours, which
+ * a drive-up window can also do; "Steakhouse" in its categories is what the
+ * place is.
+ */
+export function sitDownSignal(candidate: AskCandidate): string | null {
+  const identity = identityText(candidate)
+  return SIT_DOWN_TOKENS.find((token) => containsToken(identity, token)) || null
+}
+
+/**
+ * The stored evidence that a listing cannot host a date night, or null.
+ *
+ * Two things disqualify a listing, and both are about format rather than
+ * quality: its own name or categories say it is a to-go counter, a window or a
+ * truck, or it is one of the brands that is nothing but a window
+ * (NON_SIT_DOWN_BRANDS). A diner who asks for a format outright keeps it, and
+ * a diner who names a brand outright keeps that too — the same exemption the
+ * cuisine and chain filters already make — but a brand with no dining room
+ * anywhere is never the answer to "date night".
+ */
+export function dateNightFormatBlock(
+  candidate: AskCandidate,
+  schema: AskSchema,
+  options: { namedBrand?: boolean } = {}
+): string | null {
+  if (!wantsDateNight(schema)) return null
+
+  const windowBrand = NON_SIT_DOWN_BRANDS.find((brand) => nameCarriesBrand(candidate.name, brand))
+  if (windowBrand) return windowBrand
+
+  if (options.namedBrand) return null
+
+  const identity = identityText(candidate)
+  for (const format of SERVICE_FORMATS) {
+    if (schema.formats.includes(format.label)) continue
+    const matched = format.tokens.find((token) => containsFormatToken(identity, token))
+    if (matched) return matched
+  }
+
+  return null
 }
 
 function priceIndex(level: PriceLevel): number {
@@ -246,6 +347,15 @@ export function applyHardFilters(
 
     if (excludeTokens.some((token) => containsToken(identityText(candidate), token))) {
       remove('cuisine_exclude')
+      return false
+    }
+
+    // A date night is a table for two, so the formats that have no table are
+    // out regardless of what else they score. This is the filter that keeps a
+    // drive-up daiquiri window from answering "date night" on the strength of
+    // a "wine" tag.
+    if (dateNightFormatBlock(candidate, schema, { namedBrand }) !== null) {
+      remove('date_night_format')
       return false
     }
 
@@ -382,6 +492,18 @@ export function scoreCandidate(
     }
   }
 
+  // What the listing is, on an ask that turns on having a room to sit in.
+  // Cited as our reading of the stored word, since the word is what we hold.
+  const sitDown = sitDownSignal(candidate)
+  if (wantsDateNight(schema) && sitDown) {
+    addReason({
+      kind: 'sit_down',
+      detail: 'sit-down dinner',
+      evidence: sitDown,
+      weight: SIT_DOWN_WEIGHT,
+    })
+  }
+
   // Vibe, matched against tags, features, categories and description.
   let vibeWeight = 0
   let pricedForVibe = false
@@ -394,6 +516,20 @@ export function scoreCandidate(
       const weight = Math.min(2, 4 - vibeWeight)
       if (weight > 0) {
         addReason({ kind: 'vibe', detail: label, evidence: matchedToken, weight })
+        vibeWeight += weight
+      }
+      continue
+    }
+
+    // A token that goes with the vibe without establishing it — a wine list on
+    // a date-night ask. It corroborates a listing that already reads as a
+    // sit-down room and counts for nothing on its own, so a bare "wine" tag
+    // can no longer carry a listing into the picks by itself.
+    const weakToken = def.weakTokens?.find((token) => containsToken(fit, token))
+    if (weakToken && sitDown) {
+      const weight = Math.min(WEAK_VIBE_WEIGHT, 4 - vibeWeight)
+      if (weight > 0) {
+        addReason({ kind: 'vibe', detail: label, evidence: weakToken, weight })
         vibeWeight += weight
       }
       continue

@@ -34,6 +34,10 @@ function clauseFor(reason: MatchReason): string | null {
       return reason.evidence
         ? `${reason.detail}, tagged "${reason.evidence}"`
         : `${reason.detail} match`
+    case 'sit_down':
+      return reason.evidence
+        ? `${reason.detail}, read from its listed "${reason.evidence}"`
+        : reason.detail
     case 'kids':
       return reason.evidence ? `tagged "${reason.evidence}" for kids` : 'listed as kid-friendly'
     case 'party_size':

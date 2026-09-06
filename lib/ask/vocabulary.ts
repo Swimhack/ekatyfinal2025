@@ -150,6 +150,16 @@ export interface VibeDef {
   synonyms: string[]
   /** Substrings matched against stored restaurant text. */
   tokens: string[]
+  /**
+   * Substrings that corroborate the vibe without establishing it.
+   *
+   * "wine" is the case this exists for. A wine list is shared by a candlelit
+   * dining room and by a drive-up daiquiri window, so on its own it says
+   * nothing about whether there is a table to sit at. lib/ask/rank.ts counts
+   * these only once something else about the listing reads as a sit-down room,
+   * and then only faintly.
+   */
+  weakTokens?: string[]
   /** Price tiers that also support this vibe, used as a weaker signal. */
   priceTiers?: BudgetTier[]
 }
@@ -158,7 +168,8 @@ export const VIBES: VibeDef[] = [
   {
     label: 'date night',
     synonyms: ['date night', 'date', 'romantic', 'anniversary', 'just us two', 'my wife', 'my husband', 'my girlfriend', 'my boyfriend', 'my partner'],
-    tokens: ['date-night', 'romantic', 'wine', 'cocktail', 'intimate', 'candlelit'],
+    tokens: ['date-night', 'date night', 'romantic', 'intimate', 'candlelit'],
+    weakTokens: ['wine', 'cocktail'],
     priceTiers: ['mid', 'high'],
   },
   {
@@ -218,6 +229,108 @@ export const VIBES: VibeDef[] = [
     tokens: ['authentic', 'traditional', 'homemade'],
   },
 ]
+
+export interface ServiceFormatDef {
+  /** Canonical label used on `schema.formats`. */
+  label: string
+  /** Phrases a diner might type to ask for this format. */
+  synonyms: string[]
+  /** Substrings matched against a listing's name, categories and cuisines. */
+  tokens: string[]
+}
+
+/**
+ * Formats that decide the shape of a visit rather than what is on the menu.
+ *
+ * Each of these is a counter, a window or a truck: there is no table to sit at,
+ * so none of them can host the dinner a "date night" ask is for. lib/ask/rank.ts
+ * screens them out of that one request and leaves every other ask alone, and a
+ * diner who names a format outright ("date night at a food truck") switches
+ * their own screen off.
+ *
+ * `tokens` are matched whole-word against fields that say what a listing *is*,
+ * never against tags or a description, so "Daiquiris To Go" in a name is a
+ * match while a sit-down room that happens to list takeout is not.
+ */
+export const SERVICE_FORMATS: ServiceFormatDef[] = [
+  {
+    label: 'to-go',
+    synonyms: ['to go', 'to-go', 'takeout', 'take out', 'take-out', 'carryout', 'carry out', 'curbside'],
+    tokens: ['to go', 'to-go'],
+  },
+  {
+    label: 'drive-thru',
+    synonyms: ['drive thru', 'drive-thru', 'drive through', 'drive in', 'drive-in'],
+    tokens: ['drive thru', 'drive-thru', 'drive through', 'drive in', 'drive-in'],
+  },
+  {
+    label: 'daiquiri',
+    synonyms: ['daiquiri', 'daiquiris', 'frozen drinks'],
+    tokens: ['daiquiri'],
+  },
+  {
+    label: 'snow cone',
+    synonyms: [
+      'snow cone',
+      'snow cones',
+      'snowcone',
+      'snowcones',
+      'sno cone',
+      'sno cones',
+      'raspado',
+      'raspados',
+      'shaved ice',
+    ],
+    tokens: ['snow cone', 'snowcone', 'sno cone', 'raspado'],
+  },
+  {
+    label: 'food truck',
+    synonyms: ['food truck', 'food trucks', 'taco truck', 'taco trucks', 'food trailer', 'food trailers'],
+    tokens: ['food truck', 'food trailer'],
+  },
+]
+
+/**
+ * Stored words that read as a dining room rather than a counter.
+ *
+ * These are the sit-down signals our own listings already carry, and they are
+ * the evidence a date-night pick is ranked on. Matching one is cited as our
+ * reading of that stored word, not as a claim about a room we have seen.
+ */
+export const SIT_DOWN_TOKENS: string[] = [
+  'fine dining',
+  'fine-dining',
+  'white tablecloth',
+  'upscale',
+  'steakhouse',
+  'chophouse',
+  'italian',
+  'trattoria',
+  'ristorante',
+  'osteria',
+  'cucina',
+  'bistro',
+  'brasserie',
+  'seafood',
+  'oyster bar',
+  'sushi',
+  'tapas',
+  'wine bar',
+  'dining room',
+  'private dining',
+]
+
+/**
+ * Brands whose entire format is a walk-up or drive-up window.
+ *
+ * Like KNOWN_CHAIN_BRANDS this is a reviewable list in code, not a claim
+ * written onto any restaurant record, and membership only ever removes a
+ * candidate from one kind of request. An entry belongs here when the brand has
+ * no dining room at all, so no wording of a date-night ask should answer with
+ * it however its categories happen to be filled in. Eskimo Hut sells daiquiris
+ * through a drive-up window.
+ */
+export const NON_SIT_DOWN_BRANDS: string[] = ['eskimo hut']
 
 /**
  * Katy-area place names. These are only ever matched against the `address`

@@ -33,6 +33,14 @@ export interface AskSchema {
    * would otherwise apply.
    */
   brands: string[]
+  /**
+   * Service formats the diner asked for outright, e.g. "to-go", "food truck".
+   *
+   * A date-night ask screens these formats out, because none of them has a
+   * table to sit at. Naming one is the diner overriding that screen for
+   * themselves; it never adds a format to a request that did not mention one.
+   */
+  formats: string[]
   /** Named Katy area matched against listing addresses, e.g. "Cinco Ranch". */
   area?: string
   /** 5-digit ZIP mentioned in the request. */
@@ -85,6 +93,7 @@ export type MatchReasonKind =
   | 'area'
   | 'vibe'
   | 'vibe_price'
+  | 'sit_down'
   | 'kids'
   | 'party_size'
   | 'open_now'
