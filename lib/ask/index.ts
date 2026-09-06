@@ -25,6 +25,7 @@ export {
   applyHardFilters,
   brandMatchIds,
   dateNightFormatBlock,
+  isNonRestaurant,
   scoreCandidate,
   sitDownSignal,
   suppressesChainsForSurprise,
@@ -48,6 +49,7 @@ const FILTER_LABELS: Record<string, string> = {
   exclude_chains: 'no chains',
   surprise_chains: 'skipping the multi-location brands for a surprise',
   date_night_format: 'a table to sit at for date night',
+  non_restaurant: 'skipping listings that are not places to eat',
   budget_ceiling: 'your price ceiling',
   open_now: 'open right now',
 }

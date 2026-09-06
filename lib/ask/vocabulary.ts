@@ -333,6 +333,78 @@ export const SIT_DOWN_TOKENS: string[] = [
 export const NON_SIT_DOWN_BRANDS: string[] = ['eskimo hut']
 
 /**
+ * Name/slug/description tokens that mean the listing is not a place to eat.
+ *
+ * Reviewable code list only — never written into Neon. Ask hard-filters these
+ * out of every pick so lodging, rentals and other non-restaurants that were
+ * miscategorized as Restaurant cannot answer a dining ask. Prefer specific
+ * tokens ("rentals", "motel") over broad ones ("farm") so real kitchens stay.
+ */
+export const NON_RESTAURANT_TOKENS: string[] = [
+  'rentals',
+  'rental',
+  'vacation rental',
+  'vacation rentals',
+  'bed and breakfast',
+  'bed & breakfast',
+  'hotel',
+  'motel',
+  'apartments',
+  'apartment',
+  'self storage',
+  'storage units',
+  'real estate',
+  'car wash',
+  'daycare',
+  'day care',
+  'rv park',
+  'trailer park',
+  'airbnb',
+]
+
+/**
+ * The same idea for barbershops, salons and med spas, matched against a
+ * listing's name and slug only.
+ *
+ * These words are safe in a name and treacherous in a description: Jersey
+ * Mike's describes its cold cuts, a snow-cone stand describes shaved ice, and
+ * a bakery describes its brownies. Reading only what the business calls itself
+ * is what lets "cuts" drop BruceFamilycuts and SUPERCUTS without touching a
+ * deli.
+ *
+ * Entries are also chosen to survive substring matching, since that is how
+ * these are compared. "cuts" cannot occur inside "biscuits" or "coconuts", so
+ * it is safe, while bare "clips" hides in "eclipse", "lash" in "splash",
+ * "spa" in "raspados", "brow" in "brownie" and "cut" in "executive" — so those
+ * are spelled out as the longer phrase or the brand instead.
+ */
+export const NON_RESTAURANT_NAME_TOKENS: string[] = [
+  'barber',
+  'salon',
+  'cuts',
+  'haircut',
+  'hairstyl',
+  'hair studio',
+  'hair design',
+  'hair removal',
+  'great clips',
+  'sport clips',
+  'medspa',
+  'med spa',
+  'day spa',
+  'nail spa',
+  'nail bar',
+  'massage',
+  'waxing',
+  'eyelash',
+  'lash bar',
+  'brow bar',
+  'blow dry',
+  'tanning',
+  'botox',
+]
+
+/**
  * Katy-area place names. These are only ever matched against the `address`
  * column of existing listings, so an area that is not in our data simply does
  * not match — we never map an area to coordinates we made up.

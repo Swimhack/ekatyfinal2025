@@ -22,6 +22,8 @@ import {
 import {
   AREA_ALIASES,
   CUISINES,
+  NON_RESTAURANT_NAME_TOKENS,
+  NON_RESTAURANT_TOKENS,
   NON_SIT_DOWN_BRANDS,
   SERVICE_FORMATS,
   SIT_DOWN_TOKENS,
@@ -302,6 +304,24 @@ export interface HardFilterResult {
 }
 
 /**
+ * True when name/slug/description read as lodging or another non-dining business.
+ * Categories alone are not trusted — junk rows often say Restaurant.
+ *
+ * Two lists, because the two families of junk words behave differently in a
+ * description. A rental listing describes its rooms, so lodging words are read
+ * across the description too; a delicatessen describes its cold cuts, so the
+ * barbershop and salon words are read from the name and slug alone, where the
+ * business is naming itself rather than its menu.
+ */
+export function isNonRestaurant(candidate: AskCandidate): boolean {
+  const nameAndSlug = normalizeText([candidate.name, candidate.slug || ''].join(' | '))
+  if (NON_RESTAURANT_NAME_TOKENS.some((token) => containsToken(nameAndSlug, token))) return true
+
+  const hay = normalizeText([nameAndSlug, candidate.description || ''].join(' | '))
+  return NON_RESTAURANT_TOKENS.some((token) => containsToken(hay, token))
+}
+
+/**
  * Applies every non-negotiable constraint. A candidate is removed only on
  * positive evidence: unknown hours, for instance, are never treated as closed.
  */
@@ -347,6 +367,14 @@ export function applyHardFilters(
 
     if (excludeTokens.some((token) => containsToken(identityText(candidate), token))) {
       remove('cuisine_exclude')
+      return false
+    }
+
+    // Miscategorized lodging, rentals, barbershops and other non-dining
+    // businesses never answer a dining ask, even when categories say
+    // Restaurant.
+    if (isNonRestaurant(candidate)) {
+      remove('non_restaurant')
       return false
     }
 
