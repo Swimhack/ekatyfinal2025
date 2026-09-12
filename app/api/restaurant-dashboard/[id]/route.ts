@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { authorizeRestaurantAccess } from '@/lib/auth/restaurant-access'
 
 // GET - Fetch restaurant dashboard data
 export async function GET(
@@ -9,11 +8,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // TODO: Verify restaurant owner authentication
-    // const session = await getSession(request)
-    // if (!session || session.restaurantId !== params.id) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
+    const access = await authorizeRestaurantAccess(params.id)
+    if (!access.authorized) {
+      return access.response
+    }
 
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: params.id },
@@ -22,8 +20,7 @@ export async function GET(
           include: {
             user: {
               select: {
-                name: true,
-                email: true
+                name: true
               }
             }
           },
@@ -87,10 +84,22 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    // TODO: Verify restaurant owner authentication
-    
+    const access = await authorizeRestaurantAccess(params.id)
+    if (!access.authorized) {
+      return access.response
+    }
+
     const body = await request.json()
     const { name, description, phone, website, address, hours } = body
+
+    const existing = await prisma.restaurant.findUnique({
+      where: { id: params.id },
+      select: { id: true }
+    })
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 404 })
+    }
 
     const restaurant = await prisma.restaurant.update({
       where: { id: params.id },

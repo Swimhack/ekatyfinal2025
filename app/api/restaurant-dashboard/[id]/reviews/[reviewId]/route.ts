@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { authorizeRestaurantAccess } from '@/lib/auth/restaurant-access'
 
 // POST - Respond to a review (restaurant owner only)
 export async function POST(
@@ -9,9 +8,11 @@ export async function POST(
   { params }: { params: { id: string; reviewId: string } }
 ) {
   try {
-    // TODO: Verify restaurant owner authentication
-    // Ensure the authenticated user owns this restaurant
-    
+    const access = await authorizeRestaurantAccess(params.id)
+    if (!access.authorized) {
+      return access.response
+    }
+
     const body = await request.json()
     const { response } = body
 
@@ -20,6 +21,16 @@ export async function POST(
         { error: 'Response text is required' },
         { status: 400 }
       )
+    }
+
+    // The review must belong to the restaurant the session is authorized for
+    const target = await prisma.review.findFirst({
+      where: { id: params.reviewId, restaurantId: params.id },
+      select: { id: true }
+    })
+
+    if (!target) {
+      return NextResponse.json({ error: 'Review not found' }, { status: 404 })
     }
 
     // Update the review with owner response

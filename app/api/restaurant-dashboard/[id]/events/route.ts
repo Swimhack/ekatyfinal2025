@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { authorizeRestaurantAccess } from '@/lib/auth/restaurant-access'
 
 // POST - Create a new event
 export async function POST(
@@ -9,8 +8,11 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // TODO: Verify restaurant owner authentication
-    
+    const access = await authorizeRestaurantAccess(params.id)
+    if (!access.authorized) {
+      return access.response
+    }
+
     const body = await request.json()
     const { title, description, startDate, endDate, imageUrl } = body
 

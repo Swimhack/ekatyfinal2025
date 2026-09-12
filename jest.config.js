@@ -4,7 +4,18 @@ module.exports = {
   roots: ['<rootDir>/tests'],
   testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest',
+    '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: {
+        module: 'commonjs',
+        moduleResolution: 'node',
+        target: 'es2022',
+        jsx: 'react-jsx',
+        esModuleInterop: true,
+      },
+    }],
+  },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
   },
   collectCoverageFrom: [
     '**/*.{js,jsx,ts,tsx}',
