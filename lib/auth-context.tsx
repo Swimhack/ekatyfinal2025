@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import { parseJsonResponse } from '@/lib/utils/api-response'
 
 interface AuthUser {
   id: string
@@ -26,26 +27,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check for existing session via API
     fetch('/api/auth/session')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        setUser(data?.user || null)
+      .then(res => parseJsonResponse<{ user: AuthUser | null }>(res, 'Failed to read session'))
+      .then(parsed => {
+        if (!parsed.ok) {
+          console.warn('Session check failed:', parsed.status, parsed.error)
+        }
+        setUser(parsed.data?.user || null)
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const res = await fetch('/api/auth/signin', {
+    // Real endpoint in this app is /api/auth/login; /api/auth/signin never existed.
+    const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     })
-    if (!res.ok) {
-      const data = await res.json()
-      throw new Error(data.error || 'Sign in failed')
+    const parsed = await parseJsonResponse<{ user: AuthUser }>(res, 'Sign in failed')
+    if (!parsed.ok || !parsed.data) {
+      throw new Error(parsed.error || 'Sign in failed')
     }
-    const data = await res.json()
-    setUser(data.user)
+    setUser(parsed.data.user)
   }
 
   const signUp = async (email: string, password: string, fullName?: string) => {
@@ -54,28 +58,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, name: fullName }),
     })
-    if (!res.ok) {
-      const data = await res.json()
-      throw new Error(data.error || 'Sign up failed')
+    const parsed = await parseJsonResponse<{ user: AuthUser }>(res, 'Sign up failed')
+    if (!parsed.ok || !parsed.data) {
+      throw new Error(parsed.error || 'Sign up failed')
     }
-    const data = await res.json()
-    setUser(data.user)
+    setUser(parsed.data.user)
   }
 
   const signOut = async () => {
-    await fetch('/api/auth/signout', { method: 'POST' })
+    await fetch('/api/auth/logout', { method: 'POST' })
     setUser(null)
   }
 
   const resetPassword = async (email: string) => {
-    const res = await fetch('/api/auth/reset-password', {
+    // This app recovers accounts with an emailed magic link rather than a
+    // password-reset token endpoint.
+    const res = await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     })
-    if (!res.ok) {
-      const data = await res.json()
-      throw new Error(data.error || 'Password reset failed')
+    const parsed = await parseJsonResponse(res, 'Password reset failed')
+    if (!parsed.ok) {
+      throw new Error(parsed.error || 'Password reset failed')
     }
   }
 

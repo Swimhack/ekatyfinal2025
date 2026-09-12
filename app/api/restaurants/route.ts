@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { orderPhotosWithHeroFirst, resolveHeroImage } from '@/lib/restaurant-images'
 
 export async function GET(request: NextRequest) {
   try {
@@ -130,16 +131,22 @@ export async function GET(request: NextRequest) {
       'BUDGET': 1, 'MODERATE': 2, 'UPSCALE': 3, 'PREMIUM': 4
     }
 
-    restaurants = restaurants.map(r => ({
-      ...r,
-      lat: r.latitude,
-      lng: r.longitude,
-      categories: r.categories ? r.categories.split(',').map((c: string) => c.trim()) : [],
-      cuisineTypes: r.cuisineTypes ? r.cuisineTypes.split(',').map((c: string) => c.trim()) : [],
-      photos: r.photos ? r.photos.split(',').map((p: string) => p.trim()) : [],
-      hours: r.hours ? JSON.parse(r.hours) : {},
-      priceLevel: priceLevelMap[r.priceLevel] || 2,
-    }))
+    restaurants = restaurants.map(r => {
+      // Cards read `heroImage` (or `photos[0]`), so both must carry the hero.
+      const heroImage = resolveHeroImage(r)
+
+      return {
+        ...r,
+        lat: r.latitude,
+        lng: r.longitude,
+        categories: r.categories ? r.categories.split(',').map((c: string) => c.trim()) : [],
+        cuisineTypes: r.cuisineTypes ? r.cuisineTypes.split(',').map((c: string) => c.trim()) : [],
+        photos: orderPhotosWithHeroFirst(r.photos, heroImage),
+        hours: r.hours ? JSON.parse(r.hours) : {},
+        priceLevel: priceLevelMap[r.priceLevel] || 2,
+        heroImage,
+      }
+    })
     
     // Get total count for pagination
     const total = await prisma.restaurant.count({ where })

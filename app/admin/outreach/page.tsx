@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 interface OutreachSegment {
   name: string
@@ -34,7 +35,7 @@ export default function OutreachDashboard() {
   async function loadOutreachData() {
     try {
       const res = await fetch('/api/admin/outreach/segments')
-      const data = await res.json()
+      const data = await readJson(res)
 
       if (data.segments) {
         setSegments(data.segments)
@@ -58,7 +59,7 @@ export default function OutreachDashboard() {
         body: JSON.stringify({ segment: segmentName })
       })
 
-      const data = await res.json()
+      const data = await readJson(res)
 
       if (data.success) {
         alert(`Successfully sent ${data.sent} emails!`)

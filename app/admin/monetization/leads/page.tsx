@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 interface User {
   id: string
@@ -56,7 +57,7 @@ export default function MonetizationLeadsPage() {
       })
 
       if (response.ok) {
-        const data = await response.json()
+        const data = await readJson(response)
         setAdminUsers(data.users || [])
       }
     } catch (error) {
@@ -85,7 +86,7 @@ export default function MonetizationLeadsPage() {
         throw new Error('Failed to fetch leads')
       }
 
-      const data = await response.json()
+      const data = await readJson(response)
       const fetchedLeads = data.leads || []
       setLeads(fetchedLeads)
 

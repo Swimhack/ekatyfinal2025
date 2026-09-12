@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 interface SearchResult {
   name: string
@@ -48,7 +49,7 @@ export default function ImportRestaurantPage() {
 
     try {
       const response = await fetch(`/api/admin/import-restaurant?q=${encodeURIComponent(searchQuery)}`)
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (!response.ok) {
         setError(data.message || 'Restaurant not found')
@@ -80,7 +81,7 @@ export default function ImportRestaurantPage() {
         body: JSON.stringify({ restaurantName: searchQuery })
       })
 
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (!response.ok) {
         setError(data.message || 'Import failed')

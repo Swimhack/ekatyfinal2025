@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { parseJsonResponse } from '@/lib/utils/api-response'
 
 interface Restaurant {
   id: string
@@ -25,6 +26,7 @@ interface Restaurant {
 export default function AdminRestaurantsPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'featured'>('all')
 
@@ -33,14 +35,31 @@ export default function AdminRestaurantsPage() {
   }, [])
 
   const fetchRestaurants = async () => {
+    setLoading(true)
+    setLoadError('')
+
     try {
       const response = await fetch('/api/admin/restaurants')
-      if (response.ok) {
-        const data = await response.json()
-        setRestaurants(data.restaurants || [])
+      // Safe parse: a proxy error page or auth redirect returns HTML, and
+      // response.json() on that throws "Unexpected token '<'".
+      const parsed = await parseJsonResponse<{ restaurants?: Restaurant[] }>(
+        response,
+        'Failed to load restaurants'
+      )
+
+      if (!parsed.ok) {
+        console.error('Failed to fetch restaurants:', parsed.status, parsed.rawBody)
+        setLoadError(parsed.error || 'Failed to load restaurants')
+        setRestaurants([])
+        return
       }
+
+      setRestaurants(parsed.data?.restaurants || [])
     } catch (error) {
       console.error('Failed to fetch restaurants:', error)
+      setLoadError(
+        error instanceof Error ? error.message : 'Failed to load restaurants (network error)'
+      )
     } finally {
       setLoading(false)
     }
@@ -131,6 +150,24 @@ export default function AdminRestaurantsPage() {
               </Link>
             </div>
           </div>
+
+          {loadError && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-800 rounded-lg p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-semibold">Could not load restaurants</p>
+                  <p className="text-sm mt-1">{loadError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchRestaurants}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors shrink-0"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Search and Filters */}
           <div className="bg-white rounded-lg shadow p-4">

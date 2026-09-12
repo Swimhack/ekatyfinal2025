@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Filter } from 'lucide-react'
 import Link from 'next/link'
 import OutreachTable from '@/components/admin/monetization/OutreachTable'
+import { readJson } from '@/lib/utils/api-response'
 
 interface Campaign {
   id: string
@@ -36,7 +37,7 @@ export default function OutreachCampaignsPage() {
       const response = await fetch(
         `/api/admin/outreach?${queryParams.toString()}`
       )
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (response.ok) {
         setCampaigns(data.campaigns)

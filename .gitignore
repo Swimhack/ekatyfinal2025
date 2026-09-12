@@ -41,3 +41,7 @@ next-env.d.ts
 *.db-journal
 prisma/dev.db
 prisma/dev.db-journal
+# runtime image uploads (written on the server, keep committed assets explicit)
+/public/uploads/restaurants/*
+!/public/uploads/restaurants/hero-harlem-road-bbq.jpg
+/public/uploads/profiles/*

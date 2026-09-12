@@ -6,6 +6,7 @@ import { ArrowLeft, Send, Save, Mail } from 'lucide-react'
 import Link from 'next/link'
 import LeadSelector from '@/components/admin/monetization/LeadSelector'
 import { replaceTemplateVariables } from '@/lib/utils/template-variables'
+import { readJson } from '@/lib/utils/api-response'
 
 interface Campaign {
   id: string
@@ -60,7 +61,7 @@ export default function CampaignDetailPage() {
     try {
       setLoading(true)
       const response = await fetch(`/api/admin/outreach/${campaignId}`)
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (response.ok) {
         setCampaign(data.campaign)
@@ -92,7 +93,7 @@ export default function CampaignDetailPage() {
         body: JSON.stringify(formData),
       })
 
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (response.ok) {
         setCampaign(data.campaign)
@@ -129,7 +130,7 @@ export default function CampaignDetailPage() {
         }),
       })
 
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (response.ok) {
         setSuccessMessage(
