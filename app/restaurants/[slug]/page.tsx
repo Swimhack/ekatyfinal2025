@@ -7,6 +7,7 @@ import BlogPreview from '@/components/BlogPreview'
 import ShareDiscoveryCard from '@/components/ShareDiscoveryCard'
 import ClaimRestaurantCard from '@/components/ClaimRestaurantCard'
 import { useToast } from '@/contexts/ToastContext'
+import { buildSpinSimilarHref } from '@/lib/spinner/similar'
 
 // Review Form Component
 function ReviewForm({ restaurantId, restaurantName, onClose }: { restaurantId: string, restaurantName: string, onClose: () => void }) {
@@ -533,7 +534,7 @@ export default function RestaurantDetailPage() {
               {/* Action Buttons */}
               <div className="flex flex-col gap-2 mt-6">
                 <Link
-                  href={`/spinner?restaurant=${restaurant.id}`}
+                  href={buildSpinSimilarHref(restaurant)}
                   className="btn-primary text-center"
                 >
                   🎰 Spin Similar

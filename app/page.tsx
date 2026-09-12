@@ -6,6 +6,7 @@ import SearchBar from '@/components/SearchBar'
 import RestaurantCard from '@/components/RestaurantCard'
 import BlogPreview from '@/components/BlogPreview'
 import LaunchPromotionSection from '@/components/LaunchPromotionSection'
+import { GrubRouletteSection } from '@/components/home/GrubRouletteSection'
 import Script from 'next/script'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useGamification } from '@/contexts/GamificationContext'
@@ -251,24 +252,9 @@ export default function HomePage() {
       </section>
 
       {/* Grub Roulette CTA */}
-      <section className="py-16 bg-gradient-to-r from-primary-500 to-primary-600 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="text-6xl mb-4">🎰</div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            {t('cantDecide')}
-          </h2>
-          <p className="text-xl mb-8 text-primary-100">
-            {t('grubRouletteDesc')}
-          </p>
-          <Link 
-            href="/spinner" 
-            className="bg-white text-primary-600 px-8 py-4 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-flex items-center text-lg"
-          >
-            <span className="mr-2">{t('startSpinning')}</span>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <GrubRouletteSection />
         </div>
       </section>
 
