@@ -166,7 +166,7 @@ export function PhotoManager({
       <div
         className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
           dragActive
-            ? 'border-brand-400 bg-brand-50'
+            ? 'border-primary-400 bg-primary-50'
             : 'border-gray-300 hover:border-gray-400'
         }`}
         onDragEnter={handleDrag}
@@ -185,7 +185,7 @@ export function PhotoManager({
 
         {uploading ? (
           <div className="space-y-2">
-            <div className="animate-spin w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full mx-auto" />
+            <div className="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full mx-auto" />
             <p className="text-gray-600">Uploading…</p>
           </div>
         ) : (
@@ -226,7 +226,7 @@ export function PhotoManager({
                   unoptimized={photo.startsWith('/')}
                 />
                 {index === 0 && (
-                  <div className="absolute top-2 left-2 bg-brand-500 text-white text-xs px-2 py-1 rounded">
+                  <div className="absolute top-2 left-2 bg-primary-500 text-white text-xs px-2 py-1 rounded">
                     Primary
                   </div>
                 )}
