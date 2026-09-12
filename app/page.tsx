@@ -110,9 +110,20 @@ export default function HomePage() {
               🎁 {t('heroLaunchBadge')}
             </p>
             
-            {/* Search Bar */}
+            {/* Search Bar — hands the sentence to Ask eKaty */}
             <div className="max-w-2xl mx-auto mb-8">
-              <SearchBar />
+              <SearchBar target="ask" />
+              <p className="mt-3 text-sm text-primary-100">
+                Ask in plain English — party size, budget, area, cuisine, vibe.{' '}
+                <Link href="/ask" className="underline hover:text-white">
+                  Try Ask eKaty
+                </Link>{' '}
+                or{' '}
+                <Link href="/discover" className="underline hover:text-white">
+                  browse the directory
+                </Link>
+                .
+              </p>
             </div>
             
             {/* CTA Buttons */}
