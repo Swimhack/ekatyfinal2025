@@ -5,7 +5,6 @@ import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { uploadToR2, isR2Configured } from '@/lib/r2-storage'
-import { photoService } from '@/lib/services/photo-service'
 
 export interface PhotoUploadResult {
   success: boolean
@@ -13,12 +12,30 @@ export interface PhotoUploadResult {
   error?: string
 }
 
+const ALLOWED_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+])
+const MAX_BYTES = 5 * 1024 * 1024
+
+function validateUploadFile(file: File): string | null {
+  if (!ALLOWED_TYPES.has(file.type)) {
+    return 'File must be JPEG, PNG, WebP, or GIF'
+  }
+  if (file.size > MAX_BYTES) {
+    return 'File size must be less than 5MB'
+  }
+  return null
+}
+
 export async function uploadRestaurantPhoto(
   file: File,
   restaurantId: string,
   kind: 'photo' | 'hero' | 'logo' = 'photo'
 ): Promise<PhotoUploadResult> {
-  const validationError = photoService.validateUploadFile(file)
+  const validationError = validateUploadFile(file)
   if (validationError) {
     return { success: false, error: validationError }
   }

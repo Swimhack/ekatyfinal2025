@@ -1,5 +1,3 @@
-import { RESTAURANT_CATEGORIES } from '@/lib/categories'
-
 /**
  * Shown when a restaurant has no photograph of its own.
  *
@@ -27,6 +25,32 @@ const PALETTES: Array<[string, string]> = [
   ['#334155', '#475569'],
 ]
 
+// Mirrors the cuisine set the category landing pages use. Kept local so the
+// placeholder has no dependency on page-level data.
+const CUISINE_MARKS: Array<{ slug: string; emoji: string; tags: string[] }> = [
+  { slug: 'mexican', emoji: '🌮', tags: ['mexican', 'tex-mex', 'taqueria', 'tacos'] },
+  { slug: 'bbq', emoji: '🍖', tags: ['bbq', 'barbecue', 'barbeque', 'smokehouse'] },
+  { slug: 'pizza', emoji: '🍕', tags: ['pizza', 'pizzeria'] },
+  { slug: 'italian', emoji: '🍝', tags: ['italian', 'pasta'] },
+  { slug: 'sushi', emoji: '🍣', tags: ['sushi', 'sushi bar'] },
+  { slug: 'japanese', emoji: '🍱', tags: ['japanese', 'ramen', 'hibachi', 'teriyaki'] },
+  { slug: 'chinese', emoji: '🥟', tags: ['chinese', 'dim sum', 'szechuan'] },
+  { slug: 'thai', emoji: '🌶️', tags: ['thai'] },
+  { slug: 'vietnamese', emoji: '🍜', tags: ['vietnamese', 'pho', 'banh mi'] },
+  { slug: 'indian', emoji: '🍛', tags: ['indian', 'curry', 'tandoori'] },
+  { slug: 'greek', emoji: '🥙', tags: ['greek', 'mediterranean', 'gyro'] },
+  { slug: 'seafood', emoji: '🦐', tags: ['seafood', 'cajun', 'crawfish', 'oyster'] },
+  { slug: 'steakhouse', emoji: '🥩', tags: ['steakhouse', 'steak'] },
+  { slug: 'breakfast', emoji: '🥞', tags: ['breakfast', 'brunch', 'donuts', 'bakery'] },
+  { slug: 'coffee', emoji: '☕', tags: ['coffee', 'cafe', 'coffee shop', 'tea'] },
+  { slug: 'desserts', emoji: '🍰', tags: ['desserts', 'dessert', 'ice cream', 'frozen yogurt'] },
+  { slug: 'healthy', emoji: '🥗', tags: ['healthy', 'salad', 'vegan', 'vegetarian', 'juice'] },
+  { slug: 'bar', emoji: '🍺', tags: ['bar', 'brewery', 'pub', 'sports bar', 'wine bar'] },
+  { slug: 'asian', emoji: '🥡', tags: ['asian', 'korean', 'filipino', 'noodles'] },
+  { slug: 'fast-food', emoji: '🍟', tags: ['fast food', 'fast casual'] },
+  { slug: 'american', emoji: '🍔', tags: ['american', 'burgers', 'diner', 'wings', 'sandwiches'] },
+]
+
 function hash(value: string): number {
   let h = 0
   for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) >>> 0
@@ -46,9 +70,9 @@ function markFor(restaurant: any): string {
   const tags = new Set([...toTags(restaurant?.cuisineTypes), ...toTags(restaurant?.categories)])
   // "Restaurant" and "Food" sit on almost everything, so a specific cuisine has
   // to win even though it appears later in the list.
-  for (const category of RESTAURANT_CATEGORIES) {
+  for (const category of CUISINE_MARKS) {
     if (category.slug === 'american' || category.slug === 'fast-food') continue
-    if (category.tags.some((tag) => tags.has(tag.toLowerCase()))) return category.emoji
+    if (category.tags.some((tag) => tags.has(tag))) return category.emoji
   }
   if (tags.has('american') || tags.has('fast food') || tags.has('diner')) return '🍔'
   return '🍽️'

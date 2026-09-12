@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { uploadToR2, isR2Configured } from '@/lib/r2-storage'
 import { upsertPhotoRights } from '@/lib/photos/photo-rights'
+import { OWNER_ATTESTATION } from '@/lib/photos/attestation'
 
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 const MAX_BYTES = 5 * 1024 * 1024
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
         url,
         status,
         rightsBasis,
-        attestation: true,
+        attestationText: OWNER_ATTESTATION,
         credit,
         license,
         sourceUrl,

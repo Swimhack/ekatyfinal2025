@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest'
 import {
   applyReachability,
   auditRestaurantPhotos,
@@ -6,24 +5,28 @@ import {
   photosFieldLocked,
   summarizeAudit,
 } from '@/lib/photos/photo-audit'
-import { getDisplayPhoto } from '@/lib/services/photo-service'
-import { isStockPhotoUrl } from '@/lib/photos/photo-policy'
+import {
+  isStockPhotoUrl,
+  pickDisplayPhoto,
+} from '@/lib/photos/photo-policy'
 
-describe('photo-service stock suppression', () => {
+describe('photo policy stock suppression', () => {
   it('detects Unsplash stock URLs', () => {
     expect(isStockPhotoUrl('https://images.unsplash.com/photo-123')).toBe(true)
     expect(isStockPhotoUrl('https://cdn.example.com/restaurant.jpg')).toBe(false)
   })
 
-  it('does not return stock images as display photos', () => {
+  it('does not pick stock images as the display photo', () => {
     expect(
-      getDisplayPhoto([
-        'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
-        'https://cdn.example.com/real.jpg',
-      ])
+      pickDisplayPhoto({
+        photos:
+          'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800,https://cdn.example.com/real.jpg',
+      })
     ).toBe('https://cdn.example.com/real.jpg')
 
-    expect(getDisplayPhoto(['https://images.unsplash.com/photo-x'])).toBeNull()
+    expect(
+      pickDisplayPhoto({ photos: 'https://images.unsplash.com/photo-x' })
+    ).toBeNull()
   })
 })
 
