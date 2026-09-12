@@ -46,25 +46,28 @@ export default function RestaurantDashboardPage() {
   const [editMode, setEditMode] = useState(false)
   const [editedRestaurant, setEditedRestaurant] = useState<Partial<Restaurant>>({})
 
-  // Mock restaurant ID - in production, get from auth session
-  // For demo purposes, we'll fetch the first restaurant
   const [restaurantId, setRestaurantId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // First, get a restaurant ID to demo with
-    fetch('/api/restaurants?limit=1')
-      .then(res => res.json())
+    // Only listings the signed-in user is a verified owner of are manageable
+    fetch('/api/owner/restaurants')
+      .then(async res => {
+        if (res.status === 401) {
+          throw new Error('Please sign in to access your restaurant dashboard.')
+        }
+        return res.json()
+      })
       .then(data => {
         if (data.restaurants && data.restaurants.length > 0) {
           setRestaurantId(data.restaurants[0].id)
         } else {
-          setError('No restaurants found in database')
+          setError('No claimed restaurants found for your account.')
           setLoading(false)
         }
       })
       .catch(err => {
-        setError('Failed to load restaurant data')
+        setError(err.message || 'Failed to load restaurant data')
         setLoading(false)
       })
   }, [])
@@ -111,6 +114,9 @@ export default function RestaurantDashboardPage() {
         await fetchRestaurantData()
         setEditMode(false)
         alert('Profile updated successfully!')
+      } else {
+        const data = await response.json().catch(() => ({}))
+        alert(data.error || 'Failed to update profile')
       }
     } catch (error) {
       console.error('Failed to update profile:', error)
@@ -129,6 +135,9 @@ export default function RestaurantDashboardPage() {
       if (res.ok) {
         await fetchRestaurantData()
         alert('Response posted successfully!')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || 'Failed to post response')
       }
     } catch (error) {
       console.error('Failed to respond to review:', error)
@@ -147,6 +156,9 @@ export default function RestaurantDashboardPage() {
       if (response.ok) {
         await fetchRestaurantData()
         alert('Event created successfully!')
+      } else {
+        const data = await response.json().catch(() => ({}))
+        alert(data.error || 'Failed to create event')
       }
     } catch (error) {
       console.error('Failed to create event:', error)
@@ -176,7 +188,7 @@ export default function RestaurantDashboardPage() {
           </p>
           <div className="space-y-3">
             <p className="text-sm text-gray-500">
-              This is a demo dashboard. In production, restaurant owners will authenticate to manage their profiles.
+              Only verified restaurant owners can manage a listing. Claim your restaurant to get access.
             </p>
             <Link
               href="/"
