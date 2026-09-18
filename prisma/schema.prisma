@@ -40,6 +40,7 @@ model User {
   assignedLeads     MonetizationLead[] @relation("AssignedLeads")
   claimRequests     RestaurantClaim[]
   ownedRestaurants  RestaurantOwner[]
+  photoSubmissions  RestaurantPhotoSubmission[]
 
   @@map("users")
 }
@@ -87,7 +88,8 @@ model Restaurant {
   owners        RestaurantOwner[]
   claims        RestaurantClaim[]
   partnerships  Partnership[]
-  
+  photoSubmissions RestaurantPhotoSubmission[]
+
   @@index([latitude, longitude])
   @@index([featured])
   @@index([categories])
@@ -95,6 +97,34 @@ model Restaurant {
   @@index([city])
   @@index([sourceId])
   @@map("restaurants")
+}
+
+
+// Owner/admin submitted photos awaiting or recording rights clearance
+model RestaurantPhotoSubmission {
+  id              String      @id @default(cuid())
+  restaurantId    String      @map("restaurant_id")
+  submittedById   String      @map("submitted_by_id")
+  url             String
+  status          String      @default("pending") // pending, approved, rejected
+  rightsBasis     String      @map("rights_basis") // owner_attestation, admin_license
+  attestationText String      @map("attestation_text")
+  credit          String?
+  license         String?
+  sourceUrl       String?     @map("source_url")
+  adminNotes      String?     @map("admin_notes")
+  reviewedBy      String?     @map("reviewed_by")
+  reviewedAt      DateTime?   @map("reviewed_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  restaurant      Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  submittedBy     User        @relation(fields: [submittedById], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([submittedById])
+  @@index([status])
+  @@map("restaurant_photo_submissions")
 }
 
 // Reviews table

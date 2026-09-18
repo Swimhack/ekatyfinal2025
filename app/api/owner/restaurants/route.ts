@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
+import { getCurrentUser } from '@/lib/auth'
 
 // GET - Get restaurants owned by the current user
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const userId = cookieStore.get('ekaty_user_id')?.value
+    const currentUser = await getCurrentUser()
 
-    if (!userId) {
+    if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get user with their subscriptions and owned restaurants
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: currentUser.id },
       include: {
         subscriptions: {
           where: {
