@@ -1,62 +1,104 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import {
+  buildCandidateWhere,
+  parseList,
+  serializeRestaurant,
+  type CandidateFilters,
+} from '@/lib/spinner/candidates'
 
-export async function POST(request: NextRequest) {
+const NUMERIC_PRICE_LEVELS: Record<string, string> = {
+  '1': 'BUDGET',
+  '2': 'MODERATE',
+  '3': 'UPSCALE',
+  '4': 'PREMIUM',
+}
+
+/**
+ * Price levels arrive either as enum names ("BUDGET") from JSON bodies or as the
+ * numeric 1-4 scale from query strings, so normalise both into enum names.
+ */
+function normalizePriceLevels(values: string[]): string[] {
+  return values
+    .map(value => NUMERIC_PRICE_LEVELS[value] || value.toUpperCase())
+    .filter(value => Object.values(NUMERIC_PRICE_LEVELS).includes(value))
+}
+
+/**
+ * Callers historically disagreed about where the filters live: the wheel sends
+ * them as a query string on a POST with no body, while other clients send a JSON
+ * body. Reading both keeps every caller working instead of throwing on an empty
+ * body.
+ */
+async function readFilters(request: NextRequest): Promise<CandidateFilters> {
+  const params = request.nextUrl.searchParams
+  let body: any = {}
+
+  if (request.method !== 'GET') {
+    body = await request.json().catch(() => ({}))
+  }
+
+  return {
+    categories: [...parseList(params.get('categories')), ...parseList(body.categories)],
+    terms: [...parseList(params.get('terms')), ...parseList(body.terms)],
+    priceLevels: normalizePriceLevels([
+      ...parseList(params.get('priceLevel')),
+      ...parseList(params.get('priceLevels')),
+      ...parseList(body.priceLevel),
+      ...parseList(body.priceLevels),
+    ]),
+    excludeIds: [...parseList(params.get('excludeIds')), ...parseList(body.excludeIds)],
+  }
+}
+
+async function spin(request: NextRequest, { record }: { record: boolean }) {
   try {
-    const body = await request.json()
-    const { categories, priceLevel } = body
-
-    // Build filter conditions
-    const where: any = { active: true }
-
-    if (categories && categories.length > 0) {
-      where.OR = categories.map((cat: string) => ({
-        categories: { contains: cat }
-      }))
-    }
-
-    if (priceLevel && priceLevel.length > 0) {
-      const priceLevelMap: Record<number, string> = {
-        1: 'BUDGET', 2: 'MODERATE', 3: 'UPSCALE', 4: 'PREMIUM'
-      }
-      where.priceLevel = {
-        in: priceLevel.map((p: number) => priceLevelMap[p] || 'MODERATE')
-      }
-    }
+    const filters = await readFilters(request)
 
     const restaurants = await prisma.restaurant.findMany({
-      where,
+      where: buildCandidateWhere(filters),
       take: 100,
     })
 
     if (restaurants.length === 0) {
-      return NextResponse.json(
-        { error: 'No restaurants found matching criteria' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'No restaurants found matching criteria' }, { status: 404 })
     }
 
-    const randomIndex = Math.floor(Math.random() * restaurants.length)
-    const restaurant = restaurants[randomIndex]
+    const restaurant = restaurants[Math.floor(Math.random() * restaurants.length)]
 
-    // Log the spin
-    try {
-      await prisma.spin.create({
-        data: {
-          restaurantId: restaurant.id,
-          spinParams: JSON.stringify({ categories, priceLevel }),
-        }
-      })
-    } catch (e) {
-      // Non-critical, don't fail the request
+    if (record) {
+      try {
+        await prisma.spin.create({
+          data: {
+            restaurantId: restaurant.id,
+            spinParams: JSON.stringify(filters),
+          },
+        })
+      } catch (error) {
+        console.error('Failed to record spin:', error)
+      }
     }
 
-    return NextResponse.json({ restaurant })
+    return NextResponse.json({
+      restaurant: { ...restaurant, ...serializeRestaurant(restaurant) },
+      candidatesCount: restaurants.length,
+    })
   } catch (error) {
     console.error('Error spinning restaurant:', error)
-    return NextResponse.json(
-      { error: 'Failed to spin restaurant' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to spin restaurant' }, { status: 500 })
   }
+}
+
+/**
+ * Read-only draw. This endpoint takes no authentication, so a GET must never
+ * insert a `spin` row: that would let anyone inflate the analytics table (and
+ * a restaurant's roulette counts) with a link or a prefetch. Recording belongs
+ * to POST, which is what the spinner UI uses.
+ */
+export async function GET(request: NextRequest) {
+  return spin(request, { record: false })
+}
+
+export async function POST(request: NextRequest) {
+  return spin(request, { record: true })
 }

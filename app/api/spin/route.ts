@@ -1,175 +1,166 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Prisma } from '@prisma/client'
+import {
+  applyGeoFilter,
+  buildCandidateWhere,
+  isProbablyOpenNow,
+  parseList,
+  parseNumber,
+  serializeRestaurant,
+  weightFor,
+  weightedPick,
+  type CandidateFilters,
+  type GeoFilters,
+} from '@/lib/spinner/candidates'
+
+/** Upper bound on how many rows the wheel pool endpoint will hand back. */
+const MAX_POOL = 60
+
+const CANDIDATE_INCLUDE = {
+  _count: {
+    select: {
+      reviews: true,
+      favorites: true,
+    },
+  },
+} as const
+
+interface SpinRequest extends CandidateFilters, GeoFilters {
+  openNow?: boolean
+  userId?: string | null
+  sessionId?: string | null
+}
+
+async function loadCandidates(filters: CandidateFilters, geo: GeoFilters, openNow: boolean) {
+  const candidates = await prisma.restaurant.findMany({
+    where: buildCandidateWhere(filters),
+    include: CANDIDATE_INCLUDE,
+  })
+
+  let filtered: any[] = applyGeoFilter(candidates, geo)
+
+  if (openNow && !isProbablyOpenNow()) {
+    filtered = []
+  }
+
+  return filtered
+}
+
+/**
+ * Wheel pool. The spinner needs real names to paint on the wedges before it can
+ * ask for a winner, so this returns the candidate set for the current filters.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const params = request.nextUrl.searchParams
+
+    const filters: CandidateFilters = {
+      categories: parseList(params.get('categories')),
+      terms: parseList(params.get('terms')),
+      priceLevels: parseList(params.get('priceLevels') || params.get('priceLevel')),
+      excludeIds: parseList(params.get('excludeIds')),
+    }
+
+    const geo: GeoFilters = {
+      lat: parseNumber(params.get('lat')),
+      lng: parseNumber(params.get('lng')),
+      radius: parseNumber(params.get('radius')),
+    }
+
+    const limit = Math.min(parseNumber(params.get('limit')) ?? 24, MAX_POOL)
+    const candidates = await loadCandidates(filters, geo, params.get('openNow') === 'true')
+
+    // Shuffle so repeated visits do not always paint the same wedges, but keep
+    // the total so the UI can tell the user how deep the pool really is.
+    const shuffled = [...candidates].sort(() => Math.random() - 0.5).slice(0, limit)
+
+    return NextResponse.json({
+      restaurants: shuffled.map(serializeRestaurant),
+      total: candidates.length,
+    })
+  } catch (error) {
+    console.error('Error loading spin pool:', error)
+    return NextResponse.json({ error: 'Failed to load spin pool' }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    
+    const body: SpinRequest = await request.json().catch(() => ({} as SpinRequest))
+
     const {
       categories = [],
+      terms = [],
       priceLevel,
+      priceLevels = [],
       openNow = false,
       radius = 5,
       lat,
       lng,
       excludeIds = [],
+      includeIds = [],
       userId = null,
-      sessionId = null
+      sessionId = null,
     } = body
-    
-    // Build query filters
-    const where: Prisma.RestaurantWhereInput = {
-      active: true,
-      id: {
-        notIn: excludeIds
-      }
+
+    const filters: CandidateFilters = {
+      categories: parseList(categories),
+      terms: parseList(terms),
+      priceLevel: priceLevel ?? null,
+      priceLevels: parseList(priceLevels),
+      excludeIds: parseList(excludeIds),
+      includeIds: parseList(includeIds),
     }
-    
-    // Category filter
-    if (categories.length > 0) {
-      where.OR = categories.map((cat: string) => ({
-        categories: { contains: cat }
-      }))
+
+    const geo: GeoFilters = {
+      lat: parseNumber(lat),
+      lng: parseNumber(lng),
+      radius: parseNumber(radius),
     }
-    
-    // Price level filter
-    if (priceLevel) {
-      where.priceLevel = priceLevel
-    }
-    
-    // Get candidate restaurants
-    let candidates = await prisma.restaurant.findMany({
-      where,
-      include: {
-        _count: {
-          select: {
-            reviews: true,
-            favorites: true
-          }
-        }
-      }
-    })
-    
-    // Filter by distance if coordinates provided
-    if (lat && lng) {
-      const userLat = parseFloat(lat)
-      const userLng = parseFloat(lng)
-      const maxDistance = parseFloat(radius)
-      
-      candidates = candidates.filter(restaurant => {
-        const distance = calculateDistance(
-          userLat,
-          userLng,
-          restaurant.latitude,
-          restaurant.longitude
-        )
-        return distance <= maxDistance
-      })
-    }
-    
-    // Filter by open now (simplified - would need real hours checking)
-    if (openNow) {
-      const now = new Date()
-      const currentHour = now.getHours()
-      const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-      const currentDay = days[now.getDay()] // 'mon', 'tue', etc.
-      
-      candidates = candidates.filter(restaurant => {
-        // This is simplified - real implementation would parse hours JSON
-        // For now, assume restaurants open 11am-10pm
-        return currentHour >= 11 && currentHour < 22
-      })
-    }
-    
+
+    const candidates = await loadCandidates(filters, geo, openNow)
+
     if (candidates.length === 0) {
-      return NextResponse.json(
-        { error: 'No restaurants match your criteria' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'No restaurants match your criteria' }, { status: 404 })
     }
-    
-    // Weighted random selection (favor featured and high-rated)
-    const weights = candidates.map(r => {
-      let weight = 1
-      if (r.featured) weight += 2
-      if (r.rating && r.rating >= 4.5) weight += 1
-      if (r._count.reviews > 100) weight += 1
-      return weight
-    })
-    
-    const totalWeight = weights.reduce((a, b) => a + b, 0)
-    let random = Math.random() * totalWeight
-    let selectedIndex = 0
-    
-    for (let i = 0; i < weights.length; i++) {
-      random -= weights[i]
-      if (random <= 0) {
-        selectedIndex = i
-        break
-      }
-    }
-    
-    const selected = candidates[selectedIndex]
-    
-    // Parse string fields back to arrays
-    const formattedSelected = {
-      ...selected,
-      categories: selected.categories ? selected.categories.split(',').map((c: string) => c.trim()) : [],
-      cuisineTypes: selected.cuisineTypes ? selected.cuisineTypes.split(',').map((c: string) => c.trim()) : [],
-      photos: selected.photos ? selected.photos.split(',').map((p: string) => p.trim()) : [],
-      hours: selected.hours ? JSON.parse(selected.hours) : {}
-    }
-    
-    // Generate seed for reproducibility
+
+    const selected = weightedPick(candidates, candidates.map(weightFor))
     const seed = Math.random().toString(36).substring(7)
-    
-    // Save spin to database
-    await prisma.spin.create({
-      data: {
-        userId,
-        restaurantId: selected.id,
-        spinParams: JSON.stringify({
-          categories,
-          priceLevel,
-          openNow,
-          radius,
-          lat,
-          lng
-        }),
-        seed,
-        sessionId: sessionId || (userId ? null : `anon-${Date.now()}`)
-      }
-    })
-    
+
+    // A failed analytics write should never cost the user their spin.
+    try {
+      await prisma.spin.create({
+        data: {
+          userId,
+          restaurantId: selected.id,
+          spinParams: JSON.stringify({ categories, terms, priceLevel, priceLevels, openNow, radius, lat, lng }),
+          seed,
+          sessionId: sessionId || (userId ? null : `anon-${Date.now()}`),
+        },
+      })
+    } catch (error) {
+      console.error('Failed to record spin:', error)
+    }
+
     return NextResponse.json({
-      restaurant: formattedSelected,
+      restaurant: {
+        ...selected,
+        ...serializeRestaurant(selected),
+        hours: selected.hours ? safeParseHours(selected.hours) : {},
+      },
       seed,
-      candidatesCount: candidates.length
+      candidatesCount: candidates.length,
     })
-    
   } catch (error) {
     console.error('Error processing spin:', error)
-    return NextResponse.json(
-      { error: 'Failed to process spin' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to process spin' }, { status: 500 })
   }
 }
 
-// Helper function to calculate distance
-function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 3959 // Earth's radius in miles
-  const dLat = toRad(lat2 - lat1)
-  const dLng = toRad(lng2 - lng1)
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLng/2) * Math.sin(dLng/2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-  return R * c
-}
-
-function toRad(deg: number): number {
-  return deg * (Math.PI/180)
+function safeParseHours(hours: string): Record<string, unknown> {
+  try {
+    return JSON.parse(hours)
+  } catch {
+    return {}
+  }
 }

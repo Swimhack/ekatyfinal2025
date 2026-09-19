@@ -15,6 +15,8 @@ interface GrubRouletteChallengeProps {
   spinNumber: number
 }
 
+const SPINNER_URL = 'https://ekaty.com/spinner'
+
 export default function GrubRouletteChallenge({ restaurant, spinNumber }: GrubRouletteChallengeProps) {
   const [showChallenge, setShowChallenge] = useState(false)
   const [acceptedChallenge, setAcceptedChallenge] = useState(false)
@@ -45,8 +47,8 @@ export default function GrubRouletteChallenge({ restaurant, spinNumber }: GrubRo
     const challengeText = `🎰 I just spun the Grub Roulette and got: ${restaurant.name}!\n\n🎯 My challenge: ${randomChallenge}\n\nThink I can do it? Spin your own at eKaty.com! 🍴`
 
     const urls = {
-      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(challengeText)}&url=${encodeURIComponent('https://ekaty.fly.dev/spinner')}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://ekaty.fly.dev/spinner')}&quote=${encodeURIComponent(challengeText)}`,
+      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(challengeText)}&url=${encodeURIComponent(SPINNER_URL)}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(SPINNER_URL)}&quote=${encodeURIComponent(challengeText)}`,
     }
 
     window.open(urls[platform], '_blank', 'width=600,height=400')

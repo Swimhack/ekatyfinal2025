@@ -220,6 +220,119 @@
   animation: spinWheel 4s cubic-bezier(0.17, 0.67, 0.83, 0.67) forwards;
 }
 
+/* Grub Roulette stage.
+   Modern Texas heritage: warm industrial charcoal, reclaimed-wood battens and a
+   low sage wash, instead of a black floor under a red neon glow. */
+.spinner-stage {
+  background-color: #17140f;
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% -8%, rgba(207, 162, 103, 0.26), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 12% 105%, rgba(94, 122, 78, 0.24), transparent 72%),
+    radial-gradient(ellipse 60% 45% at 92% 88%, rgba(153, 27, 27, 0.18), transparent 70%),
+    linear-gradient(180deg, #221d17 0%, #17140f 55%, #12100e 100%);
+}
+
+/* Wood-adjacent vertical battens; kept faint so text contrast is untouched. */
+.spinner-battens {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(207, 162, 103, 0.075) 0px,
+    rgba(207, 162, 103, 0.075) 1px,
+    transparent 1px,
+    transparent 86px
+  );
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 70%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 70%);
+}
+
+/* Grub Roulette motion. Every animation below is disabled by the
+   prefers-reduced-motion block at the end of this file. */
+@keyframes pointer-bounce {
+  0%, 100% {
+    transform: translate(-50%, 0) rotate(0deg);
+  }
+  45% {
+    transform: translate(-50%, 3px) rotate(-7deg);
+  }
+  70% {
+    transform: translate(-50%, 1px) rotate(4deg);
+  }
+}
+
+.animate-pointer-bounce {
+  animation: pointer-bounce 0.16s linear infinite;
+}
+
+@keyframes spin-cta-pulse {
+  0%, 100% {
+    box-shadow: 0 12px 34px -10px rgba(153, 27, 27, 0.85);
+  }
+  50% {
+    box-shadow: 0 14px 44px -8px rgba(207, 162, 103, 0.6);
+  }
+}
+
+.animate-spin-cta-pulse {
+  animation: spin-cta-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes reveal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-reveal-fade {
+  animation: reveal-fade 0.28s ease-out;
+}
+
+@keyframes reveal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-reveal-rise {
+  animation: reveal-rise 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes teaser-wheel {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-teaser-wheel {
+  animation: teaser-wheel 14s linear infinite;
+}
+
+.group:hover .animate-teaser-wheel,
+.group:focus-visible .animate-teaser-wheel {
+  animation-duration: 2.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pointer-bounce,
+  .animate-spin-cta-pulse,
+  .animate-reveal-fade,
+  .animate-reveal-rise,
+  .animate-teaser-wheel,
+  .group:hover .animate-teaser-wheel {
+    animation: none;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
