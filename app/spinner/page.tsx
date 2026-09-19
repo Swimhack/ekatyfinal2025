@@ -20,6 +20,8 @@ const priceLevels = [
 function SpinnerPageContent() {
   const searchParams = useSearchParams()
   const favoritesOnly = searchParams?.get('favoritesOnly') === 'true'
+  // Ask eKaty's "Spin similar" links arrive with a cuisine to pre-select.
+  const seededCuisine = searchParams?.get('cuisine')?.trim() || null
   
   const [isSpinning, setIsSpinning] = useState(false)
   const [result, setResult] = useState<any>(null)
@@ -33,9 +35,17 @@ function SpinnerPageContent() {
   const winSound = useSound('/sounds/win.mp3', { volume: 0.7 })
   
   // Filter states
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    seededCuisine ? [seededCuisine] : []
+  )
   const [selectedPriceLevel, setSelectedPriceLevel] = useState<string | null>(null)
   const [radius, setRadius] = useState(5)
+
+  // A seeded cuisine may be outside the default chip list (e.g. "Italian").
+  const categoryOptions =
+    seededCuisine && !categories.includes(seededCuisine)
+      ? [seededCuisine, ...categories]
+      : categories
 
   // Fetch favorites if in favorites-only mode
   useEffect(() => {
@@ -218,7 +228,7 @@ function SpinnerPageContent() {
               <div className="mb-6">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Categories</h3>
                 <div className="flex flex-wrap gap-2">
-                  {categories.map(cat => (
+                  {categoryOptions.map(cat => (
                     <button
                       key={cat}
                       onClick={() => toggleCategory(cat)}

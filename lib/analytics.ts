@@ -176,6 +176,71 @@ export function trackSearch(query: string, resultsCount: number) {
   })
 }
 
+// Track an Ask eKaty request: what was asked, how it parsed, how many picks
+// came back. `source` distinguishes the homepage hand-off from the /ask page.
+export function trackAskQuery({
+  query,
+  source,
+  resultCount,
+  schema,
+}: {
+  query: string
+  source: 'home' | 'ask' | 'spinner'
+  resultCount: number
+  schema?: Record<string, any>
+}) {
+  trackEvent({
+    eventType: 'ask',
+    eventCategory: 'ask',
+    eventAction: 'query',
+    eventLabel: query,
+    eventValue: resultCount,
+    metadata: { source, schema },
+  })
+}
+
+// Track a click through from an Ask eKaty pick to the restaurant listing.
+export function trackAskPickClick({
+  restaurantId,
+  restaurantName,
+  position,
+  source,
+  query,
+}: {
+  restaurantId: string
+  restaurantName: string
+  position: number
+  source: 'home' | 'ask' | 'spinner'
+  query: string
+}) {
+  trackEvent({
+    eventType: 'ask',
+    eventCategory: 'ask',
+    eventAction: 'pick_click',
+    eventLabel: restaurantName,
+    eventValue: position,
+    restaurantId,
+    metadata: { source, query, position },
+  })
+}
+
+// Track a hand-off from Ask eKaty picks into Grub Roulette.
+export function trackAskSpinSimilar({
+  source,
+  cuisine,
+}: {
+  source: 'home' | 'ask' | 'spinner'
+  cuisine?: string
+}) {
+  trackEvent({
+    eventType: 'ask',
+    eventCategory: 'ask',
+    eventAction: 'spin_similar',
+    eventLabel: cuisine,
+    metadata: { source, cuisine },
+  })
+}
+
 // Initialize session tracking
 export async function initializeSession() {
   if (typeof window === 'undefined') return
