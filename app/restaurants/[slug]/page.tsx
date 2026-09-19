@@ -562,7 +562,7 @@ export default function RestaurantDetailPage() {
                     cuisine: restaurant.primaryCategory || restaurant.cuisine,
                     address: restaurant.address,
                     rating: restaurant.averageRating,
-                    imageUrl: restaurant.heroImageUrl || restaurant.imageUrl
+                    imageUrl: heroImage || restaurant.heroImageUrl || restaurant.imageUrl
                   }}
                 />
               </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 interface User {
   id: string
@@ -34,7 +35,7 @@ export default function UsersManagementPage() {
           'Authorization': 'Bearer ekaty-admin-secret-2025'
         }
       })
-      const data = await response.json()
+      const data = await readJson(response)
       setUsers(data.users || [])
     } catch (error) {
       console.error('Failed to fetch users:', error)

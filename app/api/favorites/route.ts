@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { withResolvedImages } from '@/lib/restaurant-images'
 
 // GET - List user's favorites
 export async function GET(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
         id: fav.id,
         notes: fav.notes,
         createdAt: fav.createdAt,
-        restaurant: fav.restaurant
+        restaurant: withResolvedImages(fav.restaurant)
       }))
     })
 

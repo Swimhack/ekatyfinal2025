@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { parseJsonResponse } from '@/lib/utils/api-response'
 
 interface Stats {
   totalRestaurants: number
@@ -53,13 +54,13 @@ export default function AdminDashboardClient() {
   const fetchStats = async () => {
     try {
       const response = await fetch('/api/admin/stats')
-      if (!response.ok) {
-        console.error('Stats API error:', response.status, response.statusText)
-        throw new Error('Failed to fetch stats')
+      const parsed = await parseJsonResponse<Stats>(response, 'Failed to fetch stats')
+      if (!parsed.ok || !parsed.data) {
+        console.error('Stats API error:', parsed.status, parsed.rawBody)
+        throw new Error(parsed.error || 'Failed to fetch stats')
       }
-      const data = await response.json()
-      console.log('Stats loaded:', data)
-      setStats(data)
+      console.log('Stats loaded:', parsed.data)
+      setStats(parsed.data)
     } catch (error: any) {
       console.error('Failed to fetch stats:', error)
       setError(error.message || 'Failed to load dashboard data')
@@ -96,15 +97,18 @@ export default function AdminDashboardClient() {
         }
       })
 
-      const data = await response.json()
+      const parsed = await parseJsonResponse<{ message?: string; count?: number }>(
+        response,
+        'Failed to unfeature restaurants'
+      )
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to unfeature restaurants')
+      if (!parsed.ok) {
+        throw new Error(parsed.error || 'Failed to unfeature restaurants')
       }
 
       setUnfeatureMessage({
         type: 'success',
-        text: data.message || `Successfully unfeatured ${data.count} restaurant(s)`
+        text: parsed.data?.message || `Successfully unfeatured ${parsed.data?.count ?? 0} restaurant(s)`
       })
 
       // Refresh stats to reflect changes

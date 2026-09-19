@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, DollarSign, CheckCircle, XCircle } from 'lucide-react'
 import TierForm, { TierFormData } from '@/components/admin/monetization/TierForm'
+import { readJson } from '@/lib/utils/api-response'
 
 interface Tier {
   id: string
@@ -37,7 +38,7 @@ export default function TiersPage() {
       if (includeInactive) params.append('include_inactive', 'true')
 
       const response = await fetch(`/api/admin/tiers?${params.toString()}`)
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (response.ok) {
         setTiers(data.tiers)
@@ -67,7 +68,7 @@ export default function TiersPage() {
         method: 'DELETE',
       })
 
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (response.ok) {
         await fetchTiers()
@@ -94,7 +95,7 @@ export default function TiersPage() {
         body: JSON.stringify(data),
       })
 
-      const result = await response.json()
+      const result = await readJson(response)
 
       if (response.ok) {
         setShowModal(false)

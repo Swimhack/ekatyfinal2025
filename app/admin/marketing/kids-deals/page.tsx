@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 interface MarketingKidsDeal {
   enabled?: boolean
@@ -55,7 +56,7 @@ export default function KidsDealsMarketingPage() {
         params.set('status', 'active')
 
         const res = await fetch(`/api/admin/marketing/restaurants?${params.toString()}`)
-        const data = await res.json()
+        const data = await readJson(res)
 
         if (!res.ok || data.error) {
           if (!isMounted) return
@@ -178,7 +179,7 @@ export default function KidsDealsMarketingPage() {
         },
       })
 
-      const data = await res.json()
+      const data = await readJson(res)
 
       if (!res.ok || data.error) {
         setError(data.error || 'Failed to send emails')

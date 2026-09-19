@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { parseJsonResponse } from '@/lib/utils/api-response'
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 export default function EditRestaurantPage() {
   const params = useParams()
@@ -44,8 +47,9 @@ export default function EditRestaurantPage() {
   const fetchRestaurant = async () => {
     try {
       const response = await fetch(`/api/admin/restaurants/${restaurantId}`)
-      if (response.ok) {
-        const data = await response.json()
+      const parsed = await parseJsonResponse<any>(response, 'Failed to load restaurant')
+      if (parsed.ok && parsed.data) {
+        const data = parsed.data
         console.log('Loaded restaurant data, heroImage:', data.heroImage)
         setRestaurant(data)
         setFormData({
@@ -67,18 +71,49 @@ export default function EditRestaurantPage() {
           photos: data.photos || ''
         })
         setLogoPreview(data.logoUrl || '')
-        setHeroImagePreview(data.heroImage || '')
+        // Preview what the public page currently shows, which may be a photo
+        // fallback rather than a saved hero.
+        setHeroImagePreview(data.heroImage || data.displayImage || '')
         console.log('Set hero image preview to:', data.heroImage)
         if (data.photos) {
           const photosArray = data.photos.split(',').filter(Boolean)
           setPhotosPreviews(photosArray)
         }
+      } else {
+        console.error('Error loading restaurant:', parsed.status, parsed.error)
       }
     } catch (error) {
       console.error('Error fetching restaurant:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const uploadImage = async (file: File, type: 'logo' | 'hero' | 'photo'): Promise<string> => {
+    if (file.size > MAX_IMAGE_SIZE) {
+      throw new Error(`${file.name} is ${(file.size / 1024 / 1024).toFixed(1)}MB — images must be under 5MB.`)
+    }
+
+    const uploadFormData = new FormData()
+    uploadFormData.append('file', file)
+    uploadFormData.append('type', type)
+
+    const response = await fetch('/api/admin/upload', {
+      method: 'POST',
+      body: uploadFormData
+    })
+
+    const parsed = await parseJsonResponse<{ url?: string }>(response, `Failed to upload ${type} image`)
+
+    if (!parsed.ok) {
+      throw new Error(parsed.error || `Failed to upload ${type} image`)
+    }
+
+    if (!parsed.data?.url) {
+      throw new Error(`Upload of ${type} image succeeded but the server returned no image URL.`)
+    }
+
+    return parsed.data.url
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,76 +126,35 @@ export default function EditRestaurantPage() {
       let uploadedHeroImage = formData.heroImage
       let uploadedPhotos = formData.photos
 
-      if (logoFile) {
-        const logoFormData = new FormData()
-        logoFormData.append('file', logoFile)
-        logoFormData.append('type', 'logo')
-        
-        const uploadResponse = await fetch('/api/admin/upload', {
-          method: 'POST',
-          body: logoFormData
-        })
-        
-        if (uploadResponse.ok) {
-          const { url } = await uploadResponse.json()
-          uploadedLogoUrl = url
+      try {
+        if (logoFile) {
+          uploadedLogoUrl = await uploadImage(logoFile, 'logo')
         }
-      }
 
-      if (heroImageFile) {
-        console.log('Uploading hero image file:', heroImageFile.name)
-        const heroFormData = new FormData()
-        heroFormData.append('file', heroImageFile)
-        heroFormData.append('type', 'hero')
-
-        const uploadResponse = await fetch('/api/admin/upload', {
-          method: 'POST',
-          body: heroFormData
-        })
-
-        if (uploadResponse.ok) {
-          const result = await uploadResponse.json()
-          if (result.url) {
-            uploadedHeroImage = result.url
-            console.log('Hero image uploaded successfully to:', result.url)
-          } else {
-            console.error('Hero image upload response missing URL:', result)
-            alert('Failed to upload hero image: Invalid response from server')
-            setSaving(false)
-            return // Stop the save process
-          }
+        if (heroImageFile) {
+          console.log('Uploading hero image file:', heroImageFile.name)
+          uploadedHeroImage = await uploadImage(heroImageFile, 'hero')
+          console.log('Hero image uploaded successfully to:', uploadedHeroImage)
         } else {
-          const error = await uploadResponse.text()
-          console.error('Hero image upload failed:', error)
-          alert('Failed to upload hero image: ' + error)
-          setSaving(false)
-          return // Stop the save process if hero image upload fails
+          console.log('No hero image file to upload, using existing:', uploadedHeroImage)
         }
-      } else {
-        console.log('No hero image file to upload, using existing:', uploadedHeroImage)
-      }
 
-      if (photoFiles.length > 0) {
-        const photoUrls = []
-        for (const file of photoFiles) {
-          const photoFormData = new FormData()
-          photoFormData.append('file', file)
-          photoFormData.append('type', 'photo')
-          
-          const uploadResponse = await fetch('/api/admin/upload', {
-            method: 'POST',
-            body: photoFormData
-          })
-          
-          if (uploadResponse.ok) {
-            const { url } = await uploadResponse.json()
-            photoUrls.push(url)
+        if (photoFiles.length > 0) {
+          const photoUrls: string[] = []
+          for (const file of photoFiles) {
+            photoUrls.push(await uploadImage(file, 'photo'))
           }
+
+          // Combine with existing photos
+          const existingPhotos = formData.photos ? formData.photos.split(',').filter(Boolean) : []
+          uploadedPhotos = [...existingPhotos, ...photoUrls].join(',')
         }
-        
-        // Combine with existing photos
-        const existingPhotos = formData.photos ? formData.photos.split(',').filter(Boolean) : []
-        uploadedPhotos = [...existingPhotos, ...photoUrls].join(',')
+      } catch (uploadError) {
+        console.error('Image upload failed:', uploadError)
+        const message = uploadError instanceof Error ? uploadError.message : 'Image upload failed'
+        alert(`Upload failed: ${message}\n\nNothing was saved. Fix the issue above and try again.`)
+        setSaving(false)
+        return
       }
 
       const updateData = {
@@ -178,14 +172,16 @@ export default function EditRestaurantPage() {
         body: JSON.stringify(updateData)
       })
 
-      if (response.ok) {
-        const result = await response.json()
-        console.log('Update response:', result)
-        
+      const parsedUpdate = await parseJsonResponse<any>(response, 'Failed to update restaurant')
+
+      if (parsedUpdate.ok) {
+        console.log('Update response:', parsedUpdate.data)
+
         // Verify the hero image was actually saved
         const verifyResponse = await fetch(`/api/admin/restaurants/${restaurantId}`)
-        if (verifyResponse.ok) {
-          const verifiedData = await verifyResponse.json()
+        const parsedVerify = await parseJsonResponse<any>(verifyResponse, 'Failed to verify restaurant')
+        if (parsedVerify.ok && parsedVerify.data) {
+          const verifiedData = parsedVerify.data
           console.log('Verified hero image after save:', verifiedData.heroImage)
           console.log('Expected hero image:', updateData.heroImage)
 
@@ -204,12 +200,13 @@ export default function EditRestaurantPage() {
         // Force reload to clear cache
         window.location.href = `/restaurants/${restaurant.slug}`
       } else {
-        const error = await response.json()
-        alert(`Error: ${error.error || 'Failed to update restaurant'}`)
+        console.error('Restaurant update failed:', parsedUpdate.status, parsedUpdate.rawBody)
+        alert(`Error: ${parsedUpdate.error || 'Failed to update restaurant'}`)
       }
     } catch (error) {
       console.error('Error updating restaurant:', error)
-      alert('Failed to update restaurant')
+      const message = error instanceof Error ? error.message : 'Failed to update restaurant'
+      alert(`Failed to update restaurant: ${message}`)
     } finally {
       setSaving(false)
     }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Search, Check } from 'lucide-react'
+import { readJson } from '@/lib/utils/api-response'
 
 export interface Lead {
   id: string
@@ -41,7 +42,7 @@ export default function LeadSelector({
       if (statusFilter) queryParams.append('status', statusFilter)
 
       const response = await fetch(`/api/admin/leads?${queryParams.toString()}`)
-      const data = await response.json()
+      const data = await readJson(response)
 
       if (response.ok) {
         setLeads(data.leads)

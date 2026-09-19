@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 export default function SyncDataPage() {
   const [syncing, setSyncing] = useState(false)
@@ -20,7 +21,7 @@ export default function SyncDataPage() {
         }
       })
 
-      const data = await response.json()
+      const data = await readJson(response)
       setResult(data)
     } catch (error: any) {
       setResult({

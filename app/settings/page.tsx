@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { parseJsonResponse } from '@/lib/utils/api-response'
+
+const MAX_PROFILE_IMAGE_SIZE = 2 * 1024 * 1024
 
 interface UserProfile {
   id: string
@@ -26,15 +29,15 @@ export default function SettingsPage() {
   const fetchUserProfile = async () => {
     try {
       const response = await fetch('/api/auth/me')
-      if (!response.ok) {
-        if (response.status === 401) {
+      const parsed = await parseJsonResponse<{ user: UserProfile }>(response, 'Failed to fetch profile')
+      if (!parsed.ok || !parsed.data) {
+        if (parsed.status === 401) {
           router.push('/auth/signin?redirect=/settings')
           return
         }
-        throw new Error('Failed to fetch profile')
+        throw new Error(parsed.error || 'Failed to fetch profile')
       }
-      const data = await response.json()
-      setUser(data.user)
+      setUser(parsed.data.user)
     } catch (err) {
       console.error('Error fetching profile:', err)
       setError('Failed to load profile')
@@ -53,9 +56,10 @@ export default function SettingsPage() {
       return
     }
 
-    // Validate file size (2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Image must be less than 2MB')
+    // Validate file size (2MB) before the request so large files fail fast
+    // instead of being rejected mid-upload by the proxy.
+    if (file.size > MAX_PROFILE_IMAGE_SIZE) {
+      setError(`Image is ${(file.size / 1024 / 1024).toFixed(1)}MB — profile images must be less than 2MB`)
       return
     }
 
@@ -72,16 +76,17 @@ export default function SettingsPage() {
         body: formData
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Upload failed')
+      const parsed = await parseJsonResponse<{ url?: string }>(response, 'Upload failed')
+
+      if (!parsed.ok || !parsed.data?.url) {
+        console.error('Profile image upload failed:', parsed.status, parsed.rawBody)
+        throw new Error(parsed.error || 'Upload failed: server returned no image URL')
       }
 
-      const data = await response.json()
       setSuccess('Profile image updated successfully!')
 
       // Update local user state
-      setUser(prev => prev ? { ...prev, profileImageUrl: data.url } : null)
+      setUser(prev => prev ? { ...prev, profileImageUrl: parsed.data!.url ?? null } : null)
 
       // Refresh the profile
       setTimeout(() => fetchUserProfile(), 1000)
@@ -105,9 +110,10 @@ export default function SettingsPage() {
         method: 'DELETE'
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to remove image')
+      const parsed = await parseJsonResponse(response, 'Failed to remove image')
+
+      if (!parsed.ok) {
+        throw new Error(parsed.error || 'Failed to remove image')
       }
 
       setSuccess('Profile image removed')

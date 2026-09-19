@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ restaurants })
   } catch (error) {
     console.error('Error fetching restaurants:', error)
-    return NextResponse.json({ error: 'Failed to fetch restaurants' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to fetch restaurants'
+    return NextResponse.json({ error: `Failed to fetch restaurants: ${message}` }, { status: 500 })
   }
 }

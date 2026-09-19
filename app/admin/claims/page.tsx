@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 interface Claim {
   id: string
@@ -49,7 +50,7 @@ export default function ClaimsManagementPage() {
         }
       })
       
-      const data = await response.json()
+      const data = await readJson(response)
       setClaims(data.claims || [])
     } catch (error) {
       console.error('Failed to fetch claims:', error)

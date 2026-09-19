@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { readJson } from '@/lib/utils/api-response'
 
 interface Subscription {
   id: string
@@ -50,7 +51,7 @@ export default function AdminSubscriptionsPage() {
       setLoading(true)
       const response = await fetch(`/api/admin/subscriptions?status=${filter}`)
       if (response.ok) {
-        const data = await response.json()
+        const data = await readJson(response)
         setSubscriptions(data.subscriptions)
         setStats(data.stats)
       }
