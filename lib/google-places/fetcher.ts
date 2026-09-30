@@ -1,4 +1,5 @@
 import client, { GOOGLE_CONFIG, KATY_SEARCH_CONFIG } from './client';
+import { PlaceInputType } from '@googlemaps/google-maps-services-js';
 import pLimit from 'p-limit';
 import { checkAndIncrementUsage } from './rate-limiter';
 
@@ -110,6 +111,33 @@ export async function fetchPlaceDetails(placeId: string): Promise<any> {
     console.error(`Error fetching details for place ${placeId}:`, error);
     throw error;
   }
+}
+
+// Resolve a place_id for a restaurant we only know by name/address
+// (e.g. manually seeded rows that were never linked to Google Places)
+export async function findPlaceIdByText(
+  query: string
+): Promise<{ placeId: string; businessStatus?: string } | null> {
+  await checkAndIncrementUsage();
+
+  const response = await rateLimiter(() =>
+    client.findPlaceFromText({
+      params: {
+        input: query,
+        inputtype: PlaceInputType.textQuery,
+        fields: ['place_id', 'business_status', 'name', 'formatted_address'],
+        locationbias: `circle:${KATY_SEARCH_CONFIG.radius}@${KATY_SEARCH_CONFIG.center.lat},${KATY_SEARCH_CONFIG.center.lng}`,
+        key: GOOGLE_CONFIG.apiKey,
+      },
+      timeout: 10000,
+    })
+  );
+
+  const candidate: any = response.data.candidates?.[0];
+  if (!candidate?.place_id) {
+    return null;
+  }
+  return { placeId: candidate.place_id, businessStatus: candidate.business_status };
 }
 
 // Fetch photo URL for a photo reference

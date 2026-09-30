@@ -5,6 +5,7 @@ import Link from 'next/link'
 import ConditionalNav from '@/components/ConditionalNav'
 import ClientProviders from '@/components/ClientProviders'
 import ShareRewardsTracker from '@/components/ShareRewardsTracker'
+import { SITE_URL, KATY_GEO, serializeJsonLd } from '@/lib/seo'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -52,7 +53,46 @@ export const metadata: Metadata = {
     types: {
       'application/rss+xml': 'https://ekaty.fly.dev/feed.xml',
     },
-  }
+  },
+  other: {
+    'geo.region': 'US-TX',
+    'geo.placename': 'Katy',
+    'geo.position': `${KATY_GEO.lat};${KATY_GEO.lng}`,
+    ICBM: `${KATY_GEO.lat}, ${KATY_GEO.lng}`,
+  },
+}
+
+// Site-wide structured data: WebSite (with sitelinks search box action)
+// and the Organization publishing the directory
+const websiteJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  '@id': `${SITE_URL}/#website`,
+  name: 'eKaty.com',
+  url: SITE_URL,
+  description: 'Restaurant directory and dining guide for Katy, Texas',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: `${SITE_URL}/discover?q={search_term_string}`,
+    },
+    'query-input': 'required name=search_term_string',
+  },
+}
+
+const organizationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': `${SITE_URL}/#organization`,
+  name: 'eKaty.com',
+  url: SITE_URL,
+  logo: `${SITE_URL}/logo.png`,
+  areaServed: {
+    '@type': 'City',
+    name: 'Katy',
+    containedInPlace: { '@type': 'State', name: 'Texas' },
+  },
 }
 
 export default function RootLayout({
@@ -63,6 +103,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-gray-50`}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationJsonLd) }}
+        />
         {/* Skip to main content link for accessibility */}
         <a
           href="#main-content"
@@ -119,10 +167,10 @@ export default function RootLayout({
               <div>
                 <h3 className="font-semibold mb-4">Popular Categories</h3>
                 <ul className="space-y-2 text-sm">
-                  <li><Link href="/discover?category=Mexican" className="text-gray-400 hover:text-white">Mexican</Link></li>
-                  <li><Link href="/discover?category=BBQ" className="text-gray-400 hover:text-white">BBQ</Link></li>
-                  <li><Link href="/discover?category=Asian" className="text-gray-400 hover:text-white">Asian</Link></li>
-                  <li><Link href="/discover?category=American" className="text-gray-400 hover:text-white">American</Link></li>
+                  <li><Link href="/categories/mexican" className="text-gray-400 hover:text-white">Mexican</Link></li>
+                  <li><Link href="/categories/bbq" className="text-gray-400 hover:text-white">BBQ</Link></li>
+                  <li><Link href="/categories/asian" className="text-gray-400 hover:text-white">Asian</Link></li>
+                  <li><Link href="/categories/american" className="text-gray-400 hover:text-white">American</Link></li>
                 </ul>
               </div>
               
